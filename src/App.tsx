@@ -307,13 +307,13 @@ export default function App() {
               <div className="flex border-3 border-black shadow-[5px_5px_0_#000]">
                   <button 
                     onClick={() => setActiveTab('market')}
-                    className={`text-xl font-black uppercase px-6 py-3 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-paper text-black' : 'bg-transparent text-white hover:bg-white/10'}`}
+                    className={`text-xl font-black uppercase px-6 py-3 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
                   >
                     Marketplace
                   </button>
                   <button 
                     onClick={() => setActiveTab('jobs')}
-                    className={`text-xl font-black uppercase px-6 py-3 transition-colors relative ${activeTab === 'jobs' ? 'bg-paper text-black' : 'bg-transparent text-white hover:bg-white/10'}`}
+                    className={`text-xl font-black uppercase px-6 py-3 transition-colors relative ${activeTab === 'jobs' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
                   >
                     Live Jobs 
                     <span className="absolute -top-2 -right-2 text-xs h-6 w-6 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-2 border-black font-bold rounded-full">
