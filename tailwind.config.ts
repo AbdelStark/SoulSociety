@@ -11,15 +11,33 @@ export default {
           mono: ['JetBrains Mono', 'monospace'],
         },
         colors: {
-          'stark-orange': '#FF5C00',
-          'stark-orange-hover': '#FF7A2E',
-          'stark-orange-dark': '#CC4A00',
-          'nostr-purple': '#9D4EDD',
-          'nostr-purple-hover': '#B06beb',
-          'valid-green': '#00E055',
-          'paper': '#FDFBF7',
+          'stark-orange': {
+            DEFAULT: '#FF5C00',
+            hover: '#FF7A2E',
+            dark: '#CC4A00',
+            light: '#FFE5D4'
+          },
+          'nostr-purple': {
+            DEFAULT: '#9D4EDD',
+            hover: '#B06beb',
+            dark: '#7E3FAD',
+            light: '#EEDFFC'
+          },
+          'valid-green': {
+            DEFAULT: '#00E055',
+            dark: '#00B344',
+            light: '#D4FCE6'
+          },
+          'bitcoin-gold': {
+            DEFAULT: '#F7931A',
+            dark: '#C67615',
+            light: '#FDECDA'
+          },
+          'paper': {
+            DEFAULT: '#FDFBF7',
+            subtle: '#F7F4EF'
+          },
           'zk-blue-light': '#E0E7FF',
-          'bitcoin-gold': '#F7931A',
         },
         borderWidth: {
           '3': '3px',

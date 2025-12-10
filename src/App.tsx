@@ -19,10 +19,12 @@ import {
   ImageIcon,
   Languages,
   ArrowLeft,
-  Loader2
+  Loader2,
+  Book,
+  Code,
+  LineChart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
 
 // --- Types & Mock Data ---
 
@@ -53,6 +55,7 @@ type Job = {
   proofHash?: string;
   jobData?: any;
   resultData?: any;
+  progress?: number;
 };
 
 const MOCK_SERVICES: Service[] = [
@@ -114,7 +117,7 @@ const MOCK_SERVICES: Service[] = [
 const MOCK_JOBS: Job[] = [
   { id: 'job_8f7a...9c21', serviceId: 's1', status: 'verified', timestamp: '2 mins ago', proofHash: '0x7a...9f', resultData: { summary: "..." } },
   { id: 'job_3b2c...1d44', serviceId: 's3', status: 'proven', timestamp: '5 mins ago', proofHash: '0x3b...1d', resultData: { summary: "..." } },
-  { id: 'job_9e11...00p2', serviceId: 's1', status: 'processing', timestamp: 'Just now' },
+  { id: 'job_9e11...00p2', serviceId: 's1', status: 'processing', timestamp: 'Just now', progress: 60 },
 ];
 
 // --- Components ---
@@ -134,49 +137,55 @@ const BrutalButton = ({
   icon?: any;
   disabled?: boolean;
 }) => {
-  const baseStyles = "relative font-bold border-3 border-black px-6 py-3 transition-all duration-75 flex items-center justify-center gap-2 uppercase tracking-wider text-sm";
+  const baseStyles = "relative font-bold border-3 border-black px-6 py-3 transition-all duration-100 flex items-center justify-center gap-2 uppercase tracking-wider text-sm transform-gpu";
   
   const variants = {
-    primary: "bg-stark-orange text-black shadow-[5px_5px_0px_0px_#000] hover:bg-stark-orange-hover enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
-    secondary: "bg-nostr-purple text-black shadow-[5px_5px_0px_0px_#000] hover:bg-nostr-purple-hover enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
-    outline: "bg-paper text-black shadow-[5px_5px_0px_0px_#000] hover:bg-white enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
+    primary: "bg-stark-orange text-black shadow-[5px_5px_0px_0px_#000] hover:shadow-[7px_7px_0px_0px_#000] enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
+    secondary: "bg-nostr-purple text-black shadow-[5px_5px_0px_0px_#000] hover:shadow-[7px_7px_0px_0px_#000] enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
+    outline: "bg-paper text-black shadow-[5px_5px_0px_0px_#000] hover:shadow-[7px_7px_0px_0px_#000] hover:bg-paper-subtle enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
     ghost: "border-transparent hover:bg-black/5"
   };
 
-  const disabledStyles = "disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed";
+  const disabledStyles = "disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none";
 
   return (
-    <button onClick={onClick} className={`${baseStyles} ${variants[variant]} ${className} ${disabledStyles}`} disabled={disabled}>
+    <motion.button 
+      onClick={onClick} 
+      className={`${baseStyles} ${variants[variant]} ${className} ${disabledStyles}`} 
+      disabled={disabled}
+      whileHover={{ scale: disabled ? 1 : 1.05 }}
+      whileTap={{ scale: disabled ? 1 : 0.95 }}
+    >
       {Icon && <Icon size={18} strokeWidth={3} />}
       <span>{children}</span>
-    </button>
+    </motion.button>
   );
 };
 
 const BrutalCard = ({ children, className = "", color = "bg-paper", onClick }: { children: React.ReactNode, className?: string, color?: string, onClick?: () => void }) => (
-  <div onClick={onClick} className={`border-3 border-black shadow-[8px_8px_0px_0px_#CC4A00] p-6 ${color} ${className}`}>
+  <div onClick={onClick} className={`border-3 border-black shadow-[8px_8px_0px_0px_#000] p-6 ${color} ${className}`}>
     {children}
   </div>
 );
 
 const Badge = ({ children, color = "bg-gray-200", className = "" }: { children: React.ReactNode, color?: string, className?: string }) => (
-  <span className={`inline-block border-2 border-black px-2 py-1 text-xs font-bold uppercase tracking-wider ${color} ${className}`}>
+  <span className={`inline-block border-2 border-black px-3 py-1 text-sm font-bold uppercase tracking-wider ${color} ${className}`}>
     {children}
   </span>
 );
 
 const StatusIndicator = ({ status }: { status: Job['status'] }) => {
   const styles = {
-    pending: { color: 'bg-bitcoin-gold', icon: Clock, text: 'PENDING' },
-    processing: { color: 'bg-blue-400 animate-pulse', icon: Loader2, text: 'COMPUTING' },
-    proven: { color: 'bg-nostr-purple', icon: Shield, text: 'PROVEN' },
-    verified: { color: 'bg-valid-green', icon: CheckCircle, text: 'VERIFIED' },
+    pending: { color: 'bg-bitcoin-gold-light text-bitcoin-gold-dark', icon: Clock, text: 'PENDING' },
+    processing: { color: 'bg-blue-200 text-blue-800 animate-pulse', icon: Loader2, text: 'COMPUTING' },
+    proven: { color: 'bg-nostr-purple-light text-nostr-purple-dark', icon: Shield, text: 'PROVEN' },
+    verified: { color: 'bg-valid-green-light text-valid-green-dark', icon: CheckCircle, text: 'VERIFIED' },
   };
 
   const { color, icon: Icon, text } = styles[status];
 
   return (
-    <div className={`flex items-center gap-2 border-3 border-black px-3 py-1.5 ${color} text-black`}>
+    <div className={`flex items-center gap-2 border-3 border-black px-3 py-1.5 ${color}`}>
       <Icon size={16} strokeWidth={3} className={status === 'processing' ? 'animate-spin' : ''}/>
       <span className="font-bold text-sm uppercase">{text}</span>
     </div>
@@ -191,13 +200,13 @@ const SoulGeometry = () => (
   >
     <motion.div 
       className="absolute w-48 h-48 border-4 border-black bg-nostr-purple"
-      variants={{ initial: { x: -100, y: -100, opacity: 0 }, animate: { x: 0, y: 0, opacity: 1 }}}
-      transition={{ delay: 0.1, duration: 0.5 }}
+      variants={{ initial: { x: -100, y: -100, opacity: 0, rotate: -45 }, animate: { x: 0, y: 0, opacity: 1, rotate: 0 }}}
+      transition={{ delay: 0.1, type: "spring", stiffness: 100 }}
     />
     <motion.div 
       className="absolute right-0 bottom-0 w-48 h-48 border-4 border-black bg-paper"
-      variants={{ initial: { x: 100, y: 100, opacity: 0 }, animate: { x: 0, y: 0, opacity: 1 }}}
-      transition={{ delay: 0.2, duration: 0.5 }}
+      variants={{ initial: { x: 100, y: 100, opacity: 0, rotate: 45 }, animate: { x: 0, y: 0, opacity: 1, rotate: 0 }}}
+      transition={{ delay: 0.2, type: "spring", stiffness: 100 }}
     />
     <motion.div 
       className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 border-black bg-stark-orange flex items-center justify-center p-4"
@@ -245,53 +254,87 @@ const ServicePage = ({ service, onBack, onJobRequest }: { service: Service, onBa
       exit={{ opacity: 0, x: -100 }}
       transition={{ duration: 0.3 }}
     >
-      <BrutalButton onClick={onBack} variant="outline" className="mb-8">
-        <ArrowLeft/> Back to Market
-      </BrutalButton>
+      <div className="mb-8">
+        <BrutalButton onClick={onBack} variant="outline" className="!px-4">
+          <ArrowLeft size={20} strokeWidth={3}/> 
+          <span className="ml-2">Back to Market</span>
+        </BrutalButton>
+      </div>
 
-      <BrutalCard color="bg-paper" className="shadow-[10px_10px_0px_0px_#000]">
-        <div className="flex items-start gap-6 mb-6">
-          <div className="p-4 border-3 border-black bg-stark-orange shadow-[4px_4px_0_#000]">
-            <service.icon size={40} strokeWidth={2.5} className="text-black"/>
-          </div>
-          <div>
-            <h2 className="text-4xl font-black uppercase">{service.name}</h2>
-            <p className="text-lg font-medium text-black/80">{service.description}</p>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6 border-t-4 border-black border-dashed pt-6">
-          {service.formFields.map(field => (
-            <div key={field.name} className="flex flex-col">
-              <label htmlFor={field.name} className="text-lg font-bold uppercase mb-2">{field.label}</label>
-              {field.type === 'textarea' ? (
-                <textarea
-                  id={field.name}
-                  name={field.name}
-                  placeholder={field.placeholder}
-                  onChange={handleInputChange}
-                  rows={6}
-                  className="border-3 border-black p-3 font-mono text-base bg-white focus:outline-none focus:shadow-[5px_5px_0_#9D4EDD]"
-                  required
-                />
-              ) : (
-                <input
-                  id={field.name}
-                  name={field.name}
-                  type={field.type}
-                  placeholder={field.placeholder}
-                  onChange={handleInputChange}
-                  className="border-3 border-black p-3 font-mono text-base bg-white focus:outline-none focus:shadow-[5px_5px_0_#9D4EDD]"
-                  required
-                />
-              )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="lg:col-span-2">
+          <BrutalCard color="bg-paper" className="shadow-[10px_10px_0px_0px_#000] h-full">
+            <div className="flex items-start gap-6 mb-6">
+              <div className="p-4 border-3 border-black bg-stark-orange shadow-[4px_4px_0_#000]">
+                <service.icon size={40} strokeWidth={2.5} className="text-black"/>
+              </div>
+              <div>
+                <h2 className="text-4xl font-black uppercase tracking-tight">{service.name}</h2>
+                <p className="text-lg font-medium text-black/60 mt-1">{service.description}</p>
+              </div>
             </div>
-          ))}
-          <BrutalButton type="submit" variant="primary" className="w-full text-lg" disabled={isSubmitting}>
-            {isSubmitting ? <><Loader2 className="animate-spin"/> Submitting...</> : <>Request Proof ({service.price})</>}
-          </BrutalButton>
-        </form>
-      </BrutalCard>
+
+            <form onSubmit={handleSubmit} className="space-y-6 border-t-4 border-black border-dashed pt-6">
+              {service.formFields.map(field => (
+                <div key={field.name} className="flex flex-col">
+                  <label htmlFor={field.name} className="text-base font-bold uppercase mb-2 tracking-wider">{field.label}</label>
+                  {field.type === 'textarea' ? (
+                    <textarea
+                      id={field.name}
+                      name={field.name}
+                      placeholder={field.placeholder}
+                      onChange={handleInputChange}
+                      rows={6}
+                      className="border-3 border-black p-3 font-mono text-base bg-paper-subtle focus:outline-none focus:shadow-[5px_5px_0_#9D4EDD] transition-shadow duration-100 focus:bg-white"
+                      required
+                    />
+                  ) : (
+                    <input
+                      id={field.name}
+                      name={field.name}
+                      type={field.type}
+                      placeholder={field.placeholder}
+                      onChange={handleInputChange}
+                      className="border-3 border-black p-3 font-mono text-base bg-paper-subtle focus:outline-none focus:shadow-[5px_5px_0_#9D4EDD] transition-shadow duration-100 focus:bg-white"
+                      required
+                    />
+                  )}
+                </div>
+              ))}
+              <BrutalButton type="submit" variant="primary" className="w-full text-lg" disabled={isSubmitting}>
+                {isSubmitting ? <><Loader2 className="animate-spin"/> Submitting...</> : <>Request Proof ({service.price})</>}
+              </BrutalButton>
+            </form>
+          </BrutalCard>
+        </div>
+        <div className="lg:col-span-1">
+          <BrutalCard color="bg-nostr-purple-light" className="!shadow-nostr-purple-dark">
+            <h3 className="text-2xl font-black uppercase tracking-tight mb-4 border-b-3 border-black pb-3">Service Details</h3>
+            <div className="space-y-4 font-mono text-base">
+              <div className="flex justify-between">
+                <span className="font-bold text-black/60">PROVIDER:</span>
+                <span className="font-bold truncate text-black">{service.provider}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold text-black/60">AVG. LATENCY:</span>
+                <span className="font-bold text-black">{service.latency}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold text-black/60">PRICE:</span>
+                <span className="font-bold text-black">{service.price}</span>
+              </div>
+            </div>
+            <div className="mt-6 pt-6 border-t-2 border-black border-dashed">
+              <h4 className="font-bold uppercase tracking-wider mb-3">Tags</h4>
+              <div className="flex flex-wrap gap-2">
+                {service.tags.map(tag => (
+                  <Badge key={tag} color="bg-nostr-purple text-white">#{tag}</Badge>
+                ))}
+              </div>
+            </div>
+          </BrutalCard>
+        </div>
+      </div>
     </motion.div>
   )
 }
@@ -309,20 +352,30 @@ export default function App() {
   const toggleWallet = () => setWalletConnected(!walletConnected);
 
   const handleJobRequest = (newJob: Job) => {
-    setJobs(prevJobs => [newJob, ...prevJobs]);
+    const jobWithProgress = { ...newJob, progress: 0 };
+    setJobs(prevJobs => [jobWithProgress, ...prevJobs]);
     setSelectedService(null);
     setActiveTab('jobs');
 
     // Simulate job lifecycle
-    setTimeout(() => {
-      setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'processing' } : j));
-    }, 2000);
-    setTimeout(() => {
-      setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'proven', proofHash: `0x${Math.random().toString(16).substr(2, 8)}...` } : j));
-    }, 8000);
-    setTimeout(() => {
-      setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'verified' } : j));
-    }, 12000);
+    const duration = 10000; // 10 seconds
+    const interval = 100; // update every 100ms
+    let progress = 0;
+
+    const progressInterval = setInterval(() => {
+      progress += (interval / duration) * 100;
+      setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'processing', progress: Math.min(progress, 100) } : j));
+      
+      if (progress >= 100) {
+        clearInterval(progressInterval);
+        setTimeout(() => {
+          setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'proven', proofHash: `0x${Math.random().toString(16).substr(2, 8)}...` } : j));
+        }, 1000);
+        setTimeout(() => {
+          setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'verified' } : j));
+        }, 2000);
+      }
+    }, interval);
   };
 
   const filteredServices = MOCK_SERVICES.filter(s => 
@@ -338,19 +391,19 @@ export default function App() {
       <header className="relative sticky top-0 z-50 border-b-4 border-black bg-paper/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between p-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-black text-stark-orange flex items-center justify-center border-2 border-transparent">
-              <Shield size={28} />
+            <div className="w-12 h-12 bg-black text-stark-orange flex items-center justify-center">
+              <Shield size={28} strokeWidth={3}/>
             </div>
             <h1 className="text-3xl font-black tracking-tighter uppercase hidden sm:block">
               SoulSociety<span className="text-black">.</span>
             </h1>
           </div>
 
-          <div className="hidden lg:flex gap-6 items-center font-bold uppercase tracking-wider text-sm">
-            <a href="#" className="hover:text-stark-orange transition-colors">Docs</a>
-            <a href="#" className="hover:text-stark-orange transition-colors">Explorers</a>
-            <a href="#" className="hover:text-stark-orange transition-colors">Stats</a>
-          </div>
+          <nav className="hidden lg:flex gap-8 items-center font-bold uppercase tracking-wider text-sm">
+            <a href="#" className="flex items-center gap-2 hover:text-stark-orange transition-colors"><Book size={16} strokeWidth={3}/> Docs</a>
+            <a href="#" className="flex items-center gap-2 hover:text-stark-orange transition-colors"><Code size={16} strokeWidth={3}/> Explorers</a>
+            <a href="#" className="flex items-center gap-2 hover:text-stark-orange transition-colors"><LineChart size={16} strokeWidth={3}/> Stats</a>
+          </nav>
 
           <div className="flex items-center gap-4">
              <div className="hidden md:block">
@@ -382,16 +435,16 @@ export default function App() {
             <motion.div 
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed right-0 top-0 bottom-0 w-72 bg-paper border-l-4 border-black z-[70] p-6"
+              className="fixed right-0 top-0 bottom-0 w-72 bg-paper border-l-4 border-black z-[70] p-8"
             >
-              <div className="flex justify-between items-center mb-10">
+              <div className="flex justify-between items-center mb-12">
                 <h2 className="font-black text-2xl uppercase">Menu</h2>
                 <button onClick={() => setSidebarOpen(false)} className="p-1 active:translate-x-[2px] active:translate-y-[2px]"><X size={32} /></button>
               </div>
-              <div className="flex flex-col gap-6 text-xl font-bold uppercase tracking-wider">
-                <a href="#" className="hover:text-stark-orange">Docs</a>
-                <a href="#" className="hover:text-stark-orange">Explorers</a>
-                <a href="#" className="hover:text-stark-orange">Stats</a>
+              <div className="flex flex-col gap-8 text-xl font-bold uppercase tracking-wider">
+                <a href="#" className="flex items-center gap-3 hover:text-stark-orange"><Book size={20} strokeWidth={3}/> Docs</a>
+                <a href="#" className="flex items-center gap-3 hover:text-stark-orange"><Code size={20} strokeWidth={3}/> Explorers</a>
+                <a href="#" className="flex items-center gap-3 hover:text-stark-orange"><LineChart size={20} strokeWidth={3}/> Stats</a>
                 <hr className="border-black my-4 border-dashed" />
                 <BrutalButton variant="secondary" onClick={toggleWallet} className="w-full">
                   {walletConnected ? 'Disconnect' : 'Connect Nostr'}
@@ -403,22 +456,41 @@ export default function App() {
       </AnimatePresence>
 
       {/* --- Main Content --- */}
-      <main className="relative max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-20">
+      <main className="relative max-w-7xl mx-auto p-4 md:p-8 space-y-24">
 
-        {!selectedService && (
-          <>
+        <AnimatePresence mode="wait">
+        {selectedService ? (
+          <ServicePage 
+            key="service-page"
+            service={selectedService} 
+            onBack={() => setSelectedService(null)} 
+            onJobRequest={handleJobRequest}
+          />
+        ) : (
+          <motion.div key="main-content">
             {/* --- Hero Section --- */}
-            <section className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center py-12 md:py-20">
-              <div className="lg:col-span-3 space-y-6 text-center lg:text-left">
+            <motion.section 
+              className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-center py-16 md:py-24"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+              }}
+            >
+              <motion.div 
+                className="lg:col-span-3 space-y-8 text-center lg:text-left"
+                variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 }}}
+              >
                 <Badge color="bg-nostr-purple text-white" className="mx-auto lg:mx-0">Stark-Powered Trust</Badge>
-                <h2 className="text-6xl md:text-8xl font-black leading-[0.9] uppercase text-black">
+                <h2 className="text-7xl md:text-8xl font-black leading-none uppercase text-black tracking-tighter">
                   Don't Trust.
                   <br />
-                  <span className="bg-paper px-4 text-black shadow-[8px_8px_0px_0px_#000] inline-block mt-2">
+                  <span className="bg-paper px-4 text-black shadow-[8px_8px_0px_0px_#000] inline-block mt-4">
                     Verify.
                   </span>
                 </h2>
-                <p className="text-xl md:text-2xl font-medium max-w-2xl mx-auto lg:mx-0 border-l-4 border-black pl-4 py-2 mt-8">
+                <p className="text-xl md:text-2xl font-semibold max-w-2xl mx-auto lg:mx-0 !leading-relaxed">
                   Integrity by default. Powered by STARKs. A permissionless marketplace for digital services.
                 </p>
                 <div className="flex flex-wrap justify-center lg:justify-start gap-4 pt-6">
@@ -429,41 +501,46 @@ export default function App() {
                     DVM Specs
                   </BrutalButton>
                 </div>
-              </div>
+              </motion.div>
 
-              <div className="lg:col-span-2 relative hidden lg:block h-80">
+              <div className="lg:col-span-2 relative hidden lg:block h-96">
                 <SoulGeometry />
               </div>
-            </section>
+            </motion.section>
 
             {/* --- Dashboard Section --- */}
-            <section className="border-y-4 border-black bg-nostr-purple text-white">
-              <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-                <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-white pb-6 mb-8 gap-6">
+            <motion.section 
+              className="border-y-4 border-black bg-nostr-purple text-white py-12"
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+            >
+              <div className="max-w-7xl mx-auto px-4 md:px-8">
+                <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-white pb-8 mb-10 gap-8">
                   <div className="flex border-3 border-black shadow-[5px_5px_0_#000]">
                       <button 
                         onClick={() => setActiveTab('market')}
-                        className={`text-xl font-black uppercase px-6 py-3 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
+                        className={`text-xl font-bold uppercase px-8 py-4 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
                       >
                         Marketplace
                       </button>
                       <button 
                         onClick={() => setActiveTab('jobs')}
-                        className={`text-xl font-black uppercase px-6 py-3 transition-colors relative ${activeTab === 'jobs' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
+                        className={`text-xl font-bold uppercase px-8 py-4 transition-colors relative ${activeTab === 'jobs' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
                       >
                         Live Jobs 
-                        <span className="absolute -top-2 -right-2 text-xs h-6 w-6 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-2 border-black font-bold rounded-full">
+                        <span className="absolute -top-3 -right-3 text-sm h-8 w-8 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-3 border-black font-bold rounded-full">
                           {jobs.length}
                         </span>
                       </button>
                   </div>
                   
                   <div className="w-full md:w-auto relative">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black/50" size={24} strokeWidth={3}/>
+                      <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-black/40" size={24} strokeWidth={3}/>
                       <input 
                         type="text" 
                         placeholder="Find a DVM by name or tag..." 
-                        className="w-full md:w-96 border-3 border-black py-3 pl-14 pr-4 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#000] bg-paper text-black"
+                        className="w-full md:w-96 border-3 border-black py-4 pl-16 pr-6 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#000] bg-paper text-black"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
@@ -481,10 +558,20 @@ export default function App() {
                     className="min-h-[400px]"
                   >
                     {activeTab === 'market' ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      <motion.div 
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10"
+                        variants={{
+                          visible: { transition: { staggerChildren: 0.05 } }
+                        }}
+                        initial="hidden"
+                        animate="visible"
+                      >
                         {filteredServices.map((service) => (
-                          <motion.div key={service.id} whileHover={{ y: -8, x: -8 }}>
-                            <BrutalCard onClick={() => setSelectedService(service)} className="h-full flex flex-col group cursor-pointer transition-all duration-75 hover:shadow-[12px_12px_0px_0px_#CC4A00]">
+                          <motion.div 
+                            key={service.id} 
+                            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+                          >
+                            <BrutalCard onClick={() => setSelectedService(service)} className="h-full flex flex-col group cursor-pointer transition-all duration-100 hover:shadow-[12px_12px_0px_0px_#000] !shadow-nostr-purple-dark bg-paper transform-gpu hover:-translate-y-1">
                               <div className="flex justify-between items-start mb-4">
                                 <div className="p-3 border-3 border-black bg-stark-orange shadow-[4px_4px_0_#000]">
                                   <service.icon size={28} strokeWidth={2.5} className="text-black"/>
@@ -492,8 +579,8 @@ export default function App() {
                                 <Badge color="bg-bitcoin-gold text-black">{service.price}</Badge>
                               </div>
                               
-                              <h3 className="text-2xl font-black uppercase mb-2 text-black">{service.name}</h3>
-                              <p className="text-base font-medium mb-4 flex-grow text-black/80">{service.description}</p>
+                              <h3 className="text-2xl font-black uppercase tracking-tight mb-2 text-black">{service.name}</h3>
+                              <p className="text-base font-medium mb-4 flex-grow text-black/70">{service.description}</p>
                               
                               <div className="space-y-3 font-mono text-sm border-t-2 border-black pt-4 mt-auto">
                                 <div className="flex justify-between">
@@ -508,7 +595,7 @@ export default function App() {
 
                               <div className="mt-4 flex flex-wrap gap-2">
                                 {service.tags.map(tag => (
-                                  <Badge key={tag} color="bg-stark-orange/20 text-black">#{tag}</Badge>
+                                  <Badge key={tag} color="bg-stark-orange-light text-stark-orange-dark">#{tag}</Badge>
                                 ))}
                               </div>
                             </BrutalCard>
@@ -520,44 +607,61 @@ export default function App() {
                             <p className="text-white/70">Try a different search query.</p>
                           </div>
                         )}
-                      </div>
+                      </motion.div>
                     ) : (
-                      <div className="space-y-4">
-                        {jobs.map((job) => (
-                          <motion.div key={job.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: jobs.indexOf(job) * 0.1 }}>
-                            <div className="border-3 border-black bg-paper p-4 shadow-[5px_5px_0px_0px_#CC4A00] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                              <div className="flex items-start lg:items-center gap-4 w-full lg:w-auto">
-                                <div className="p-3 border-3 border-black bg-nostr-purple shadow-[3px_3px_0_#000]">
-                                  <Cpu size={24} strokeWidth={2.5} className="text-white"/>
-                                </div>
-                                <div className="flex-grow">
-                                  <div className="font-black text-xl uppercase text-black">
-                                    {MOCK_SERVICES.find(s => s.id === job.serviceId)?.name}
+                      <div className="space-y-6">
+                        <AnimatePresence>
+                          {jobs.map((job) => (
+                            <motion.div 
+                              key={job.id} 
+                              layout
+                              initial={{ opacity: 0, y: -20 }} 
+                              animate={{ opacity: 1, y: 0 }} 
+                              exit={{ opacity: 0, y: 20 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              <BrutalCard color="bg-paper-subtle" className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 !shadow-nostr-purple-dark">
+                                <div className="flex items-center gap-5 w-full lg:w-auto">
+                                  <div className="p-3 border-3 border-black bg-nostr-purple shadow-[3px_3px_0_#000]">
+                                    <Cpu size={28} strokeWidth={3} className="text-white"/>
                                   </div>
-                                  <div className="font-mono text-sm text-black/60 flex items-center gap-2">
-                                    <span>ID: {job.id}</span>
-                                    <span className="text-black/40">•</span>
-                                    <span>{job.timestamp}</span>
+                                  <div className="flex-grow">
+                                    <div className="font-black text-xl uppercase text-black">
+                                      {MOCK_SERVICES.find(s => s.id === job.serviceId)?.name}
+                                    </div>
+                                    <div className="font-mono text-sm text-black/60 flex items-center gap-2">
+                                      <span>ID: {job.id}</span>
+                                      <span className="text-black/40">•</span>
+                                      <span>{job.timestamp}</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
 
-                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
-                                {job.proofHash && (
-                                  <div className="font-mono text-xs bg-gray-100 p-2 border-2 border-black truncate flex-grow text-center">
-                                    HASH: <span className="font-bold">{job.proofHash}</span>
-                                  </div>
-                                )}
-                                <StatusIndicator status={job.status} />
-                                <BrutalButton variant="outline" className="p-3 w-full sm:w-auto">
-                                  <ChevronRight size={24} strokeWidth={3}/>
-                                </BrutalButton>
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))}
-                        <div className="border-4 border-black border-dashed p-10 text-center bg-paper/50">
-                          <p className="text-lg font-bold text-black/50 animate-pulse">Listening for new DVM events (Kind 6600)...</p>
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto self-end">
+                                  {job.status === 'processing' && job.progress !== undefined && (
+                                    <div className="w-full sm:w-32 h-8 border-2 border-black bg-white relative">
+                                      <div className="absolute inset-0 bg-blue-300" style={{ width: `${job.progress}%`}}></div>
+                                      <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-black">
+                                        {Math.round(job.progress)}%
+                                      </div>
+                                    </div>
+                                  )}
+                                  {job.proofHash && (
+                                    <div className="font-mono text-sm bg-gray-100 p-2 border-2 border-black truncate flex-grow text-center">
+                                      HASH: <span className="font-bold">{job.proofHash}</span>
+                                    </div>
+                                  )}
+                                  <StatusIndicator status={job.status} />
+                                  <BrutalButton variant="outline" className="p-3 w-full sm:w-auto !shadow-nostr-purple-dark">
+                                    <ChevronRight size={24} strokeWidth={3}/>
+                                  </BrutalButton>
+                                </div>
+                              </BrutalCard>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                        <div className="border-4 border-black border-dashed p-12 text-center bg-paper/20">
+                          <p className="text-lg font-bold text-white/50 animate-pulse">Listening for new DVM events (Kind 6600)...</p>
                         </div>
                       </div>
                     )}
@@ -565,30 +669,22 @@ export default function App() {
                 </AnimatePresence>
               </div>
             </section>
-          </>
+          </motion.div>
         )}
-
-        {selectedService && (
-          <ServicePage 
-            service={selectedService} 
-            onBack={() => setSelectedService(null)} 
-            onJobRequest={handleJobRequest}
-          />
-        )}
-
+        </AnimatePresence>
 
         {/* --- Footer --- */}
-        <footer className="border-t-4 border-black mt-20 bg-paper">
-          <div className="max-w-7xl mx-auto p-8">
+        <footer className="border-t-4 border-black mt-24 bg-paper py-12">
+          <div className="max-w-7xl mx-auto px-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
                 <div className="lg:col-span-2">
-                  <h2 className="text-4xl font-black uppercase mb-4">SoulSociety.</h2>
-                  <p className="font-medium text-lg max-w-md">
+                  <h2 className="text-4xl font-black uppercase mb-4 tracking-tighter">SoulSociety.</h2>
+                  <p className="text-lg font-semibold max-w-md !leading-relaxed">
                     A permissionless marketplace of digital services, providing integrity by default thanks to the power of STARKs.
                   </p>
                 </div>
                 <div>
-                  <h3 className="font-black text-xl border-b-3 border-black inline-block mb-4 uppercase">Protocol</h3>
+                  <h3 className="font-bold text-lg border-b-3 border-black inline-block mb-4 uppercase tracking-wider">Protocol</h3>
                   <ul className="space-y-3 text-base font-medium">
                       <li><a href="#" className="hover:text-stark-orange">NIP-90 (DVMs)</a></li>
                       <li><a href="#" className="hover:text-stark-orange">Circle STARKs</a></li>
@@ -596,7 +692,7 @@ export default function App() {
                   </ul>
                 </div>
                 <div>
-                  <h3 className="font-black text-xl border-b-3 border-black inline-block mb-4 uppercase">Community</h3>
+                  <h3 className="font-bold text-lg border-b-3 border-black inline-block mb-4 uppercase tracking-wider">Community</h3>
                   <ul className="space-y-3 text-base font-medium">
                       <li><a href="#" className="hover:text-stark-orange">Github</a></li>
                       <li><a href="#" className="hover:text-stark-orange">Nostr</a></li>
@@ -604,7 +700,7 @@ export default function App() {
                   </ul>
                 </div>
             </div>
-            <div className="mt-16 pt-8 border-t-2 border-black border-dashed font-mono text-sm text-center md:text-left">
+            <div className="mt-16 pt-8 border-t-2 border-black border-dashed font-mono text-sm text-center md:text-left text-black/60">
                 © 2025 SOULSOCIETY. NO RIGHTS RESERVED. OPEN SOURCE.
             </div>
           </div>
