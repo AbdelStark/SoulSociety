@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Shield, 
   Cpu, 
@@ -14,11 +14,24 @@ import {
   Activity,
   ChevronRight,
   GitCommit,
-  Layers
+  Layers,
+  FileText,
+  ImageIcon,
+  Languages,
+  ArrowLeft,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { text } from 'stream/consumers';
 
 // --- Types & Mock Data ---
+
+type FormField = {
+  name: string;
+  label: string;
+  type: 'text' | 'textarea' | 'number';
+  placeholder: string;
+};
 
 type Service = {
   id: string;
@@ -29,6 +42,7 @@ type Service = {
   latency: string;
   tags: string[];
   icon: React.ComponentType<{ size?: number, strokeWidth?: number, className?: string }>;
+  formFields: FormField[];
 };
 
 type Job = {
@@ -37,6 +51,8 @@ type Job = {
   status: 'pending' | 'processing' | 'proven' | 'verified';
   timestamp: string;
   proofHash?: string;
+  jobData?: any;
+  resultData?: any;
 };
 
 const MOCK_SERVICES: Service[] = [
@@ -48,43 +64,56 @@ const MOCK_SERVICES: Service[] = [
     price: '250 sats',
     latency: '~12s',
     tags: ['ZK-STARK', 'Cairo', 'Computation'],
-    icon: Cpu
+    icon: Cpu,
+    formFields: [
+      { name: 'cairoCode', label: 'Cairo Code', type: 'textarea', placeholder: 'Enter your Cairo code here...' }
+    ]
   },
   {
     id: 's2',
-    name: 'Bitcoin Block Header PoW',
-    description: 'Verifies Bitcoin block header work for light clients.',
-    provider: 'npub...btc1',
-    price: '50 sats',
-    latency: '~2s',
-    tags: ['Bitcoin', 'PoW'],
-    icon: GitCommit
+    name: 'Image Generation',
+    description: 'Generates an image from a text prompt using a diffusion model.',
+    provider: 'npub...ai88',
+    price: '1000 sats',
+    latency: '~30s',
+    tags: ['AI', 'Image'],
+    icon: ImageIcon,
+    formFields: [
+      { name: 'prompt', label: 'Prompt', type: 'text', placeholder: 'e.g., "A cat wearing a wizard hat"' }
+    ]
   },
   {
     id: 's3',
-    name: 'Image Resizer (Trustless)',
-    description: 'Resizes images and provides a hash-commitment of the operation.',
-    provider: 'npub...img9',
-    price: '100 sats',
+    name: 'Text Summarization',
+    description: 'Summarizes a long text into a few sentences.',
+    provider: 'npub...txt5',
+    price: '150 sats',
     latency: '~5s',
-    tags: ['Media', 'Utility'],
-    icon: Layers
+    tags: ['AI', 'Text'],
+    icon: FileText,
+    formFields: [
+      { name: 'textToSummarize', label: 'Text to Summarize', type: 'textarea', placeholder: 'Enter the text you want to summarize...' }
+    ]
   },
   {
     id: 's4',
-    name: 'Schnorr Signature Aggregator',
-    description: 'Aggregates multiple Schnorr signatures into a single validity proof.',
-    provider: 'npub...sig7',
-    price: '500 sats',
-    latency: '~45s',
-    tags: ['Crypto', 'Signatures'],
-    icon: Shield
-  }
+    name: 'Translation',
+    description: 'Translates text from one language to another.',
+    provider: 'npub...lang2',
+    price: '200 sats',
+    latency: '~3s',
+    tags: ['AI', 'Translation'],
+    icon: Languages,
+    formFields: [
+      { name: 'textToTranslate', label: 'Text to Translate', type: 'text', placeholder: 'Enter text...' },
+      { name: 'targetLanguage', label: 'Target Language', type: 'text', placeholder: 'e.g., "Spanish"' }
+    ]
+  },
 ];
 
 const MOCK_JOBS: Job[] = [
-  { id: 'job_8f7a...9c21', serviceId: 's1', status: 'verified', timestamp: '2 mins ago', proofHash: '0x7a...9f' },
-  { id: 'job_3b2c...1d44', serviceId: 's3', status: 'proven', timestamp: '5 mins ago', proofHash: '0x3b...1d' },
+  { id: 'job_8f7a...9c21', serviceId: 's1', status: 'verified', timestamp: '2 mins ago', proofHash: '0x7a...9f', resultData: { summary: "..." } },
+  { id: 'job_3b2c...1d44', serviceId: 's3', status: 'proven', timestamp: '5 mins ago', proofHash: '0x3b...1d', resultData: { summary: "..." } },
   { id: 'job_9e11...00p2', serviceId: 's1', status: 'processing', timestamp: 'Just now' },
 ];
 
@@ -95,33 +124,37 @@ const BrutalButton = ({
   onClick, 
   variant = 'primary', 
   className = '',
-  icon: Icon
+  icon: Icon,
+  disabled = false,
 }: { 
   children: React.ReactNode; 
   onClick?: () => void; 
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   className?: string;
   icon?: any;
+  disabled?: boolean;
 }) => {
-  const baseStyles = "relative font-bold border-3 border-black px-6 py-3 transition-all duration-75 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none flex items-center justify-center gap-2 uppercase tracking-wider text-sm";
+  const baseStyles = "relative font-bold border-3 border-black px-6 py-3 transition-all duration-75 flex items-center justify-center gap-2 uppercase tracking-wider text-sm";
   
   const variants = {
-    primary: "bg-stark-orange text-black shadow-[5px_5px_0px_0px_#000] hover:bg-stark-orange-hover",
-    secondary: "bg-nostr-purple text-black shadow-[5px_5px_0px_0px_#000] hover:bg-nostr-purple-hover",
-    outline: "bg-paper text-black shadow-[5px_5px_0px_0px_#000] hover:bg-white",
+    primary: "bg-stark-orange text-black shadow-[5px_5px_0px_0px_#000] hover:bg-stark-orange-hover enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
+    secondary: "bg-nostr-purple text-black shadow-[5px_5px_0px_0px_#000] hover:bg-nostr-purple-hover enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
+    outline: "bg-paper text-black shadow-[5px_5px_0px_0px_#000] hover:bg-white enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
     ghost: "border-transparent hover:bg-black/5"
   };
 
+  const disabledStyles = "disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed";
+
   return (
-    <button onClick={onClick} className={`${baseStyles} ${variants[variant]} ${className}`}>
+    <button onClick={onClick} className={`${baseStyles} ${variants[variant]} ${className} ${disabledStyles}`} disabled={disabled}>
       {Icon && <Icon size={18} strokeWidth={3} />}
       <span>{children}</span>
     </button>
   );
 };
 
-const BrutalCard = ({ children, className = "", color = "bg-paper" }: { children: React.ReactNode, className?: string, color?: string }) => (
-  <div className={`border-3 border-black shadow-[8px_8px_0px_0px_#CC4A00] p-6 ${color} ${className}`}>
+const BrutalCard = ({ children, className = "", color = "bg-paper", onClick }: { children: React.ReactNode, className?: string, color?: string, onClick?: () => void }) => (
+  <div onClick={onClick} className={`border-3 border-black shadow-[8px_8px_0px_0px_#CC4A00] p-6 ${color} ${className}`}>
     {children}
   </div>
 );
@@ -135,7 +168,7 @@ const Badge = ({ children, color = "bg-gray-200", className = "" }: { children: 
 const StatusIndicator = ({ status }: { status: Job['status'] }) => {
   const styles = {
     pending: { color: 'bg-bitcoin-gold', icon: Clock, text: 'PENDING' },
-    processing: { color: 'bg-blue-400', icon: Activity, text: 'COMPUTING' },
+    processing: { color: 'bg-blue-400 animate-pulse', icon: Loader2, text: 'COMPUTING' },
     proven: { color: 'bg-nostr-purple', icon: Shield, text: 'PROVEN' },
     verified: { color: 'bg-valid-green', icon: CheckCircle, text: 'VERIFIED' },
   };
@@ -144,12 +177,11 @@ const StatusIndicator = ({ status }: { status: Job['status'] }) => {
 
   return (
     <div className={`flex items-center gap-2 border-3 border-black px-3 py-1.5 ${color} text-black`}>
-      <Icon size={16} strokeWidth={3} />
+      <Icon size={16} strokeWidth={3} className={status === 'processing' ? 'animate-spin' : ''}/>
       <span className="font-bold text-sm uppercase">{text}</span>
     </div>
   );
 };
-
 
 const SoulGeometry = () => (
   <motion.div 
@@ -182,6 +214,88 @@ const SoulGeometry = () => (
   </motion.div>
 )
 
+const ServicePage = ({ service, onBack, onJobRequest }: { service: Service, onBack: () => void, onJobRequest: (job: Job) => void }) => {
+  const [formData, setFormData] = useState<any>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const newJob: Job = {
+      id: `job_${Math.random().toString(36).substr(2, 9)}`,
+      serviceId: service.id,
+      status: 'pending',
+      timestamp: 'Just now',
+      jobData: formData
+    };
+    onJobRequest(newJob);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 100 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -100 }}
+      transition={{ duration: 0.3 }}
+    >
+      <BrutalButton onClick={onBack} variant="outline" className="mb-8">
+        <ArrowLeft/> Back to Market
+      </BrutalButton>
+
+      <BrutalCard color="bg-paper" className="shadow-[10px_10px_0px_0px_#000]">
+        <div className="flex items-start gap-6 mb-6">
+          <div className="p-4 border-3 border-black bg-stark-orange shadow-[4px_4px_0_#000]">
+            <service.icon size={40} strokeWidth={2.5} className="text-black"/>
+          </div>
+          <div>
+            <h2 className="text-4xl font-black uppercase">{service.name}</h2>
+            <p className="text-lg font-medium text-black/80">{service.description}</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6 border-t-4 border-black border-dashed pt-6">
+          {service.formFields.map(field => (
+            <div key={field.name} className="flex flex-col">
+              <label htmlFor={field.name} className="text-lg font-bold uppercase mb-2">{field.label}</label>
+              {field.type === 'textarea' ? (
+                <textarea
+                  id={field.name}
+                  name={field.name}
+                  placeholder={field.placeholder}
+                  onChange={handleInputChange}
+                  rows={6}
+                  className="border-3 border-black p-3 font-mono text-base bg-white focus:outline-none focus:shadow-[5px_5px_0_#9D4EDD]"
+                  required
+                />
+              ) : (
+                <input
+                  id={field.name}
+                  name={field.name}
+                  type={field.type}
+                  placeholder={field.placeholder}
+                  onChange={handleInputChange}
+                  className="border-3 border-black p-3 font-mono text-base bg-white focus:outline-none focus:shadow-[5px_5px_0_#9D4EDD]"
+                  required
+                />
+              )}
+            </div>
+          ))}
+          <BrutalButton type="submit" variant="primary" className="w-full text-lg" disabled={isSubmitting}>
+            {isSubmitting ? <><Loader2 className="animate-spin"/> Submitting...</> : <>Request Proof ({service.price})</>}
+          </BrutalButton>
+        </form>
+      </BrutalCard>
+    </motion.div>
+  )
+}
+
 // --- Main Application ---
 
 export default function App() {
@@ -189,7 +303,27 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [walletConnected, setWalletConnected] = useState(false);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
+
   const toggleWallet = () => setWalletConnected(!walletConnected);
+
+  const handleJobRequest = (newJob: Job) => {
+    setJobs(prevJobs => [newJob, ...prevJobs]);
+    setSelectedService(null);
+    setActiveTab('jobs');
+
+    // Simulate job lifecycle
+    setTimeout(() => {
+      setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'processing' } : j));
+    }, 2000);
+    setTimeout(() => {
+      setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'proven', proofHash: `0x${Math.random().toString(16).substr(2, 8)}...` } : j));
+    }, 8000);
+    setTimeout(() => {
+      setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'verified' } : j));
+    }, 12000);
+  };
 
   const filteredServices = MOCK_SERVICES.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -271,168 +405,177 @@ export default function App() {
       {/* --- Main Content --- */}
       <main className="relative max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-20">
 
-        {/* --- Hero Section --- */}
-        <section className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center py-12 md:py-20">
-          <div className="lg:col-span-3 space-y-6 text-center lg:text-left">
-            <Badge color="bg-nostr-purple text-white" className="mx-auto lg:mx-0">Stark-Powered Trust</Badge>
-            <h2 className="text-6xl md:text-8xl font-black leading-[0.9] uppercase text-black">
-              Don't Trust.
-              <br />
-              <span className="bg-paper px-4 text-black shadow-[8px_8px_0px_0px_#000] inline-block mt-2">
-                Verify.
-              </span>
-            </h2>
-            <p className="text-xl md:text-2xl font-medium max-w-2xl mx-auto lg:mx-0 border-l-4 border-black pl-4 py-2 mt-8">
-              Integrity by default. Powered by STARKs. A permissionless marketplace for digital services.
-            </p>
-            <div className="flex flex-wrap justify-center lg:justify-start gap-4 pt-6">
-              <BrutalButton icon={Terminal} variant="secondary">
-                Explore Market
-              </BrutalButton>
-              <BrutalButton variant="outline" icon={Database}>
-                DVM Specs
-              </BrutalButton>
-            </div>
-          </div>
-
-          <div className="lg:col-span-2 relative hidden lg:block h-80">
-            <SoulGeometry />
-          </div>
-        </section>
-
-        {/* --- Dashboard Section --- */}
-        <section className="border-y-4 border-black bg-nostr-purple text-white">
-          <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-            <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-white pb-6 mb-8 gap-6">
-              <div className="flex border-3 border-black shadow-[5px_5px_0_#000]">
-                  <button 
-                    onClick={() => setActiveTab('market')}
-                    className={`text-xl font-black uppercase px-6 py-3 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
-                  >
-                    Marketplace
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('jobs')}
-                    className={`text-xl font-black uppercase px-6 py-3 transition-colors relative ${activeTab === 'jobs' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
-                  >
-                    Live Jobs 
-                    <span className="absolute -top-2 -right-2 text-xs h-6 w-6 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-2 border-black font-bold rounded-full">
-                      {MOCK_JOBS.length}
-                    </span>
-                  </button>
+        {!selectedService && (
+          <>
+            {/* --- Hero Section --- */}
+            <section className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center py-12 md:py-20">
+              <div className="lg:col-span-3 space-y-6 text-center lg:text-left">
+                <Badge color="bg-nostr-purple text-white" className="mx-auto lg:mx-0">Stark-Powered Trust</Badge>
+                <h2 className="text-6xl md:text-8xl font-black leading-[0.9] uppercase text-black">
+                  Don't Trust.
+                  <br />
+                  <span className="bg-paper px-4 text-black shadow-[8px_8px_0px_0px_#000] inline-block mt-2">
+                    Verify.
+                  </span>
+                </h2>
+                <p className="text-xl md:text-2xl font-medium max-w-2xl mx-auto lg:mx-0 border-l-4 border-black pl-4 py-2 mt-8">
+                  Integrity by default. Powered by STARKs. A permissionless marketplace for digital services.
+                </p>
+                <div className="flex flex-wrap justify-center lg:justify-start gap-4 pt-6">
+                  <BrutalButton icon={Terminal} variant="secondary">
+                    Explore Market
+                  </BrutalButton>
+                  <BrutalButton variant="outline" icon={Database}>
+                    DVM Specs
+                  </BrutalButton>
+                </div>
               </div>
-              
-              <div className="w-full md:w-auto relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black/50" size={24} strokeWidth={3}/>
-                  <input 
-                    type="text" 
-                    placeholder="Find a DVM by name or tag..." 
-                    className="w-full md:w-96 border-3 border-black py-3 pl-14 pr-4 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#000] bg-paper text-black"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+
+              <div className="lg:col-span-2 relative hidden lg:block h-80">
+                <SoulGeometry />
               </div>
-            </div>
+            </section>
 
-            {/* --- Tab Content --- */}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.2 }}
-                className="min-h-[400px]"
-              >
-                {activeTab === 'market' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredServices.map((service) => (
-                      <motion.div key={service.id} whileHover={{ y: -8, x: -8 }}>
-                        <BrutalCard className="h-full flex flex-col group cursor-pointer transition-all duration-75 hover:shadow-[12px_12px_0px_0px_#CC4A00]">
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 border-3 border-black bg-stark-orange shadow-[4px_4px_0_#000]">
-                              <service.icon size={28} strokeWidth={2.5} className="text-black"/>
-                            </div>
-                            <Badge color="bg-bitcoin-gold text-black">{service.price}</Badge>
-                          </div>
-                          
-                          <h3 className="text-2xl font-black uppercase mb-2 text-black">{service.name}</h3>
-                          <p className="text-base font-medium mb-4 flex-grow text-black/80">{service.description}</p>
-                          
-                          <div className="space-y-3 font-mono text-sm border-t-2 border-black pt-4 mt-auto">
-                            <div className="flex justify-between">
-                              <span className="text-black/60">PROVIDER:</span>
-                              <span className="font-bold truncate text-black">{service.provider}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-black/60">LATENCY:</span>
-                              <span className="font-bold text-black">{service.latency}</span>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {service.tags.map(tag => (
-                              <Badge key={tag} color="bg-stark-orange/20 text-black">#{tag}</Badge>
-                            ))}
-                          </div>
-                          
-                          <BrutalButton variant="primary" className="w-full mt-6 text-base">
-                            Request Proof
-                          </BrutalButton>
-                        </BrutalCard>
-                      </motion.div>
-                    ))}
-                    {filteredServices.length === 0 && (
-                       <div className="col-span-full text-center py-16">
-                         <p className="text-2xl font-bold text-white">No services found.</p>
-                         <p className="text-white/70">Try a different search query.</p>
-                       </div>
-                    )}
+            {/* --- Dashboard Section --- */}
+            <section className="border-y-4 border-black bg-nostr-purple text-white">
+              <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+                <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-white pb-6 mb-8 gap-6">
+                  <div className="flex border-3 border-black shadow-[5px_5px_0_#000]">
+                      <button 
+                        onClick={() => setActiveTab('market')}
+                        className={`text-xl font-black uppercase px-6 py-3 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
+                      >
+                        Marketplace
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('jobs')}
+                        className={`text-xl font-black uppercase px-6 py-3 transition-colors relative ${activeTab === 'jobs' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
+                      >
+                        Live Jobs 
+                        <span className="absolute -top-2 -right-2 text-xs h-6 w-6 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-2 border-black font-bold rounded-full">
+                          {jobs.length}
+                        </span>
+                      </button>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {MOCK_JOBS.map((job) => (
-                      <motion.div key={job.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: MOCK_JOBS.indexOf(job) * 0.1 }}>
-                        <div className="border-3 border-black bg-paper p-4 shadow-[5px_5px_0px_0px_#CC4A00] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                          <div className="flex items-start lg:items-center gap-4 w-full lg:w-auto">
-                            <div className="p-3 border-3 border-black bg-nostr-purple shadow-[3px_3px_0_#000]">
-                              <Cpu size={24} strokeWidth={2.5} className="text-white"/>
-                            </div>
-                            <div className="flex-grow">
-                              <div className="font-black text-xl uppercase text-black">
-                                {MOCK_SERVICES.find(s => s.id === job.serviceId)?.name}
-                              </div>
-                              <div className="font-mono text-sm text-black/60 flex items-center gap-2">
-                                <span>ID: {job.id}</span>
-                                <span className="text-black/40">•</span>
-                                <span>{job.timestamp}</span>
-                              </div>
-                            </div>
-                          </div>
+                  
+                  <div className="w-full md:w-auto relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black/50" size={24} strokeWidth={3}/>
+                      <input 
+                        type="text" 
+                        placeholder="Find a DVM by name or tag..." 
+                        className="w-full md:w-96 border-3 border-black py-3 pl-14 pr-4 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#000] bg-paper text-black"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                  </div>
+                </div>
 
-                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
-                            {job.proofHash && (
-                              <div className="font-mono text-xs bg-gray-100 p-2 border-2 border-black truncate flex-grow text-center">
-                                HASH: <span className="font-bold">{job.proofHash}</span>
+                {/* --- Tab Content --- */}
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="min-h-[400px]"
+                  >
+                    {activeTab === 'market' ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {filteredServices.map((service) => (
+                          <motion.div key={service.id} whileHover={{ y: -8, x: -8 }}>
+                            <BrutalCard onClick={() => setSelectedService(service)} className="h-full flex flex-col group cursor-pointer transition-all duration-75 hover:shadow-[12px_12px_0px_0px_#CC4A00]">
+                              <div className="flex justify-between items-start mb-4">
+                                <div className="p-3 border-3 border-black bg-stark-orange shadow-[4px_4px_0_#000]">
+                                  <service.icon size={28} strokeWidth={2.5} className="text-black"/>
+                                </div>
+                                <Badge color="bg-bitcoin-gold text-black">{service.price}</Badge>
                               </div>
-                            )}
-                            <StatusIndicator status={job.status} />
-                            <BrutalButton variant="outline" className="p-3 w-full sm:w-auto">
-                              <ChevronRight size={24} strokeWidth={3}/>
-                            </BrutalButton>
+                              
+                              <h3 className="text-2xl font-black uppercase mb-2 text-black">{service.name}</h3>
+                              <p className="text-base font-medium mb-4 flex-grow text-black/80">{service.description}</p>
+                              
+                              <div className="space-y-3 font-mono text-sm border-t-2 border-black pt-4 mt-auto">
+                                <div className="flex justify-between">
+                                  <span className="text-black/60">PROVIDER:</span>
+                                  <span className="font-bold truncate text-black">{service.provider}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-black/60">LATENCY:</span>
+                                  <span className="font-bold text-black">{service.latency}</span>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                {service.tags.map(tag => (
+                                  <Badge key={tag} color="bg-stark-orange/20 text-black">#{tag}</Badge>
+                                ))}
+                              </div>
+                            </BrutalCard>
+                          </motion.div>
+                        ))}
+                        {filteredServices.length === 0 && (
+                          <div className="col-span-full text-center py-16">
+                            <p className="text-2xl font-bold text-white">No services found.</p>
+                            <p className="text-white/70">Try a different search query.</p>
                           </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {jobs.map((job) => (
+                          <motion.div key={job.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: jobs.indexOf(job) * 0.1 }}>
+                            <div className="border-3 border-black bg-paper p-4 shadow-[5px_5px_0px_0px_#CC4A00] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                              <div className="flex items-start lg:items-center gap-4 w-full lg:w-auto">
+                                <div className="p-3 border-3 border-black bg-nostr-purple shadow-[3px_3px_0_#000]">
+                                  <Cpu size={24} strokeWidth={2.5} className="text-white"/>
+                                </div>
+                                <div className="flex-grow">
+                                  <div className="font-black text-xl uppercase text-black">
+                                    {MOCK_SERVICES.find(s => s.id === job.serviceId)?.name}
+                                  </div>
+                                  <div className="font-mono text-sm text-black/60 flex items-center gap-2">
+                                    <span>ID: {job.id}</span>
+                                    <span className="text-black/40">•</span>
+                                    <span>{job.timestamp}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
+                                {job.proofHash && (
+                                  <div className="font-mono text-xs bg-gray-100 p-2 border-2 border-black truncate flex-grow text-center">
+                                    HASH: <span className="font-bold">{job.proofHash}</span>
+                                  </div>
+                                )}
+                                <StatusIndicator status={job.status} />
+                                <BrutalButton variant="outline" className="p-3 w-full sm:w-auto">
+                                  <ChevronRight size={24} strokeWidth={3}/>
+                                </BrutalButton>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                        <div className="border-4 border-black border-dashed p-10 text-center bg-paper/50">
+                          <p className="text-lg font-bold text-black/50 animate-pulse">Listening for new DVM events (Kind 6600)...</p>
                         </div>
-                      </motion.div>
-                    ))}
-                    <div className="border-4 border-black border-dashed p-10 text-center bg-paper/50">
-                      <p className="text-lg font-bold text-black/50 animate-pulse">Listening for new DVM events (Kind 6600)...</p>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </section>
+                      </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </section>
+          </>
+        )}
+
+        {selectedService && (
+          <ServicePage 
+            service={selectedService} 
+            onBack={() => setSelectedService(null)} 
+            onJobRequest={handleJobRequest}
+          />
+        )}
+
 
         {/* --- Footer --- */}
         <footer className="border-t-4 border-black mt-20 bg-paper">
