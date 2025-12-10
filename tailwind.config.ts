@@ -13,6 +13,7 @@ export default {
         colors: {
           'stark-orange': '#FF5C00',
           'stark-orange-hover': '#FF7A2E',
+          'stark-orange-dark': '#CC4A00',
           'nostr-purple': '#9D4EDD',
           'nostr-purple-hover': '#B06beb',
           'valid-green': '#00E055',
