@@ -120,7 +120,7 @@ const BrutalButton = ({
   );
 };
 
-const BrutalCard = ({ children, className = "", color = "bg-paper" }: { children: React.ReactNode, className?: string, color?: string }) => (
+const BrutalCard = ({ children, className = "", color = "bg-zk-blue-light" }: { children: React.ReactNode, className?: string, color?: string }) => (
   <div className={`border-3 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-6 ${color} ${className}`}>
     {children}
   </div>
@@ -197,7 +197,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-paper text-black font-sans selection:bg-stark-orange selection:text-white bg-grid-pattern">
+    <div className="min-h-screen bg-paper text-black font-sans selection:bg-stark-orange selection:text-white">
       
       {/* --- Navigation --- */}
       <header className="sticky top-0 z-50 border-b-4 border-black bg-paper/80 backdrop-blur-md">
@@ -271,10 +271,10 @@ export default function App() {
       <main className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-20">
 
         {/* --- Hero Section --- */}
-        <section className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center py-12 md:py-20">
-          <div className="lg:col-span-3 space-y-6 text-center lg:text-left">
+        <section className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center py-12 md:py-20 bg-bitcoin-gold border-4 border-black shadow-[10px_10px_0_#000]">
+          <div className="lg:col-span-3 space-y-6 text-center lg:text-left p-8">
             <Badge color="bg-nostr-purple text-white" className="mx-auto lg:mx-0">Stark-Powered Trust</Badge>
-            <h2 className="text-6xl md:text-8xl font-black leading-[0.9] uppercase">
+            <h2 className="text-6xl md:text-8xl font-black leading-[0.9] uppercase text-black">
               Don't Trust.
               <br />
               <span className="bg-stark-orange px-4 text-white shadow-[8px_8px_0px_0px_#000] inline-block mt-2">
@@ -300,19 +300,19 @@ export default function App() {
         </section>
 
         {/* --- Dashboard Section --- */}
-        <section className="border-y-4 border-black bg-white/50">
+        <section className="border-y-4 border-black bg-nostr-purple text-white">
           <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-            <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-black pb-6 mb-8 gap-6">
+            <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-white pb-6 mb-8 gap-6">
               <div className="flex border-3 border-black shadow-[5px_5px_0_#000]">
                   <button 
                     onClick={() => setActiveTab('market')}
-                    className={`text-xl font-black uppercase px-6 py-3 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-stark-orange text-white' : 'bg-paper hover:bg-gray-100'}`}
+                    className={`text-xl font-black uppercase px-6 py-3 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-stark-orange text-white' : 'bg-paper text-black hover:bg-gray-100'}`}
                   >
                     Marketplace
                   </button>
                   <button 
                     onClick={() => setActiveTab('jobs')}
-                    className={`text-xl font-black uppercase px-6 py-3 transition-colors relative ${activeTab === 'jobs' ? 'bg-stark-orange text-white' : 'bg-paper hover:bg-gray-100'}`}
+                    className={`text-xl font-black uppercase px-6 py-3 transition-colors relative ${activeTab === 'jobs' ? 'bg-stark-orange text-white' : 'bg-paper text-black hover:bg-gray-100'}`}
                   >
                     Live Jobs 
                     <span className="absolute -top-2 -right-2 text-xs h-6 w-6 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-2 border-black font-bold rounded-full">
@@ -326,7 +326,7 @@ export default function App() {
                   <input 
                     type="text" 
                     placeholder="Find a DVM by name or tag..." 
-                    className="w-full md:w-96 border-3 border-black py-3 pl-14 pr-4 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#9D4EDD] bg-paper"
+                    className="w-full md:w-96 border-3 border-black py-3 pl-14 pr-4 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#000] bg-paper"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -345,37 +345,37 @@ export default function App() {
               >
                 {activeTab === 'market' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredServices.map((service) => (
+                    {filteredServices.map((service, index) => (
                       <motion.div key={service.id} whileHover={{ y: -8, x: -8 }}>
-                        <BrutalCard className="h-full flex flex-col group cursor-pointer transition-all duration-75 hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
+                        <BrutalCard color={index % 2 === 0 ? 'bg-valid-green' : 'bg-zk-blue-light'} className="h-full flex flex-col group cursor-pointer transition-all duration-75 hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
                           <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 border-3 border-black bg-zk-blue-light shadow-[4px_4px_0_#000]">
-                              <service.icon size={28} strokeWidth={2.5}/>
+                            <div className="p-3 border-3 border-black bg-paper shadow-[4px_4px_0_#000]">
+                              <service.icon size={28} strokeWidth={2.5} className="text-stark-orange"/>
                             </div>
-                            <Badge color="bg-bitcoin-gold text-black">{service.price}</Badge>
+                            <Badge color="bg-paper text-black">{service.price}</Badge>
                           </div>
                           
-                          <h3 className="text-2xl font-black uppercase mb-2 group-hover:text-stark-orange transition-colors">{service.name}</h3>
+                          <h3 className="text-2xl font-black uppercase mb-2 group-hover:text-paper transition-colors">{service.name}</h3>
                           <p className="text-base font-medium mb-4 flex-grow">{service.description}</p>
                           
                           <div className="space-y-3 font-mono text-sm border-t-2 border-black pt-4 mt-auto">
                             <div className="flex justify-between">
-                              <span className="text-gray-500">PROVIDER:</span>
+                              <span className="text-black/60">PROVIDER:</span>
                               <span className="font-bold truncate">{service.provider}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-500">LATENCY:</span>
+                              <span className="text-black/60">LATENCY:</span>
                               <span className="font-bold">{service.latency}</span>
                             </div>
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-2">
                             {service.tags.map(tag => (
-                              <Badge key={tag} color="bg-white">#{tag}</Badge>
+                              <Badge key={tag} color="bg-paper text-black">#{tag}</Badge>
                             ))}
                           </div>
                           
-                          <BrutalButton variant="primary" className="w-full mt-6 text-base">
+                          <BrutalButton variant="primary" className="w-full mt-6 text-base bg-paper text-black hover:bg-stark-orange hover:text-white">
                             Request Proof
                           </BrutalButton>
                         </BrutalCard>
@@ -398,7 +398,7 @@ export default function App() {
                               <Cpu size={24} strokeWidth={2.5}/>
                             </div>
                             <div className="flex-grow">
-                              <div className="font-black text-xl uppercase">
+                              <div className="font-black text-xl uppercase text-black">
                                 {MOCK_SERVICES.find(s => s.id === job.serviceId)?.name}
                               </div>
                               <div className="font-mono text-sm text-gray-500 flex items-center gap-2">
