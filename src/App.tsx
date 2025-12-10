@@ -668,8 +668,7 @@ export default function App() {
                   </motion.div>
                 </AnimatePresence>
               </div>
-            </section>
-          </motion.div>
+                          </motion.section>          </motion.div>
         )}
         </AnimatePresence>
 
