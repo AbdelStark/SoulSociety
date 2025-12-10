@@ -107,7 +107,7 @@ const BrutalButton = ({
   
   const variants = {
     primary: "bg-stark-orange text-black shadow-[5px_5px_0px_0px_#000] hover:bg-stark-orange-hover",
-    secondary: "bg-nostr-purple text-white shadow-[5px_5px_0px_0px_#000] hover:bg-nostr-purple-hover",
+    secondary: "bg-nostr-purple text-black shadow-[5px_5px_0px_0px_#000] hover:bg-nostr-purple-hover",
     outline: "bg-paper text-black shadow-[5px_5px_0px_0px_#000] hover:bg-white",
     ghost: "border-transparent hover:bg-black/5"
   };
