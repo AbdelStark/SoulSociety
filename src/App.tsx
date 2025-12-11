@@ -22,7 +22,9 @@ import {
   Loader2,
   Book,
   Code,
-  LineChart
+  LineChart,
+  FileCheck,
+  FileX
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -115,9 +117,9 @@ const MOCK_SERVICES: Service[] = [
 ];
 
 const MOCK_JOBS: Job[] = [
-  { id: 'job_8f7a...9c21', serviceId: 's1', status: 'verified', timestamp: '2 mins ago', proofHash: '0x7a...9f', resultData: { summary: "..." } },
-  { id: 'job_3b2c...1d44', serviceId: 's3', status: 'proven', timestamp: '5 mins ago', proofHash: '0x3b...1d', resultData: { summary: "..." } },
-  { id: 'job_9e11...00p2', serviceId: 's1', status: 'processing', timestamp: 'Just now', progress: 60 },
+  { id: 'job_8f7a...9c21', serviceId: 's1', status: 'verified', timestamp: '2 mins ago', proofHash: '0x7a...9f', resultData: { summary: "Cairo code verified" } },
+  { id: 'job_3b2c...1d44', serviceId: 's3', status: 'proven', timestamp: '5 mins ago', proofHash: '0x3b...1d', resultData: { summary: "This is a summary of the text." } },
+  { id: 'job_9e11...00p2', serviceId: 's2', status: 'processing', timestamp: 'Just now', progress: 60, resultData: { imageUrl: "https://placehold.co/600x400" } },
 ];
 
 // --- Components ---
@@ -339,6 +341,85 @@ const ServicePage = ({ service, onBack, onJobRequest }: { service: Service, onBa
   )
 }
 
+const ProofModal = ({ job, onClose }: { job: Job, onClose: () => void }) => {
+  const [verificationSteps, setVerificationSteps] = useState<string[]>([]);
+  const [isVerified, setIsVerified] = useState(false);
+
+  useEffect(() => {
+    const steps = [
+      'Fetching proof from decentralized storage...',
+      'Parsing proof data...',
+      'Running verification algorithm...',
+      'STARK proof is valid!',
+    ];
+    let currentStep = 0;
+    const interval = setInterval(() => {
+      setVerificationSteps(prev => [...prev, steps[currentStep]]);
+      currentStep++;
+      if (currentStep === steps.length) {
+        clearInterval(interval);
+        setIsVerified(true);
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const service = MOCK_SERVICES.find(s => s.id === job.serviceId);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.8, y: 50 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.8, y: 50 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-2xl bg-paper border-4 border-black shadow-[12px_12px_0_#000] p-8"
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-3xl font-black uppercase">Proof Verification</h2>
+          <button onClick={onClose} className="p-1 active:translate-x-[2px] active:translate-y-[2px]"><X size={32} /></button>
+        </div>
+        
+        <div className="space-y-4 font-mono text-sm border-y-3 border-black py-4">
+          {verificationSteps.map((step, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="flex items-center gap-3"
+            >
+              {i < verificationSteps.length -1 ? <Loader2 className="animate-spin text-gray-500"/> : isVerified ? <FileCheck className="text-valid-green" /> : <FileX className="text-red-500" />}
+              <span>{step}</span>
+            </motion.div>
+          ))}
+        </div>
+        
+        {isVerified && service && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6">
+            <h3 className="text-2xl font-black uppercase mb-4">Job Result</h3>
+            <BrutalCard color="bg-paper-subtle">
+              {service.id === 's2' && <img src={job.resultData.imageUrl} alt="Generated" className="border-2 border-black" />}
+              {service.id === 's3' && <p>{job.resultData.summary}</p>}
+              {service.id === 's4' && <p>{job.resultData.translatedText}</p>}
+              <div className="font-mono text-xs mt-4 pt-4 border-t-2 border-dashed border-black">
+                <p><strong>Proof Hash:</strong> {job.proofHash}</p>
+              </div>
+            </BrutalCard>
+          </motion.div>
+        )}
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // --- Main Application ---
 
 export default function App() {
@@ -348,6 +429,7 @@ export default function App() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
+  const [verifyingJob, setVerifyingJob] = useState<Job | null>(null);
 
   const toggleWallet = () => setWalletConnected(!walletConnected);
 
@@ -357,9 +439,8 @@ export default function App() {
     setSelectedService(null);
     setActiveTab('jobs');
 
-    // Simulate job lifecycle
-    const duration = 10000; // 10 seconds
-    const interval = 100; // update every 100ms
+    const duration = 10000;
+    const interval = 100;
     let progress = 0;
 
     const progressInterval = setInterval(() => {
@@ -369,7 +450,7 @@ export default function App() {
       if (progress >= 100) {
         clearInterval(progressInterval);
         setTimeout(() => {
-          setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'proven', proofHash: `0x${Math.random().toString(16).substr(2, 8)}...` } : j));
+          setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'proven', proofHash: `0x${Math.random().toString(16).substr(2, 8)}...`, resultData: { summary: "Job complete!", imageUrl: "https://placehold.co/600x400", translatedText: "Hola, mundo!" } } : j));
         }, 1000);
         setTimeout(() => {
           setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'verified' } : j));
@@ -387,7 +468,6 @@ export default function App() {
     <div className="min-h-screen bg-stark-orange text-black font-sans selection:bg-nostr-purple selection:text-white">
       <div className="absolute inset-0 bg-grid-pattern opacity-30"></div>
       
-      {/* --- Navigation --- */}
       <header className="relative sticky top-0 z-50 border-b-4 border-black bg-paper/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between p-4">
           <div className="flex items-center gap-4">
@@ -423,20 +503,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* --- Mobile Sidebar --- */}
       <AnimatePresence>
         {isSidebarOpen && (
           <>
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setSidebarOpen(false)}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]"
-            />
-            <motion.div 
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed right-0 top-0 bottom-0 w-72 bg-paper border-l-4 border-black z-[70] p-8"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]"/>
+            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: "spring", stiffness: 300, damping: 30 }} className="fixed right-0 top-0 bottom-0 w-72 bg-paper border-l-4 border-black z-[70] p-8">
               <div className="flex justify-between items-center mb-12">
                 <h2 className="font-black text-2xl uppercase">Menu</h2>
                 <button onClick={() => setSidebarOpen(false)} className="p-1 active:translate-x-[2px] active:translate-y-[2px]"><X size={32} /></button>
@@ -455,256 +526,141 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* --- Main Content --- */}
       <main className="relative max-w-7xl mx-auto p-4 md:p-8 space-y-24">
-
         <AnimatePresence mode="wait">
-        {selectedService ? (
-          <ServicePage 
-            key="service-page"
-            service={selectedService} 
-            onBack={() => setSelectedService(null)} 
-            onJobRequest={handleJobRequest}
-          />
-        ) : (
-          <motion.div key="main-content">
-            {/* --- Hero Section --- */}
-            <motion.section 
-              className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-center py-16 md:py-24"
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: { opacity: 0 },
-                visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-              }}
-            >
-              <motion.div 
-                className="lg:col-span-3 space-y-8 text-center lg:text-left"
-                variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 }}}
-              >
-                <Badge color="bg-nostr-purple text-white" className="mx-auto lg:mx-0">Stark-Powered Trust</Badge>
-                <h2 className="text-7xl md:text-8xl font-black leading-none uppercase text-black tracking-tighter">
-                  Don't Trust.
-                  <br />
-                  <span className="bg-paper px-4 text-black shadow-[8px_8px_0px_0px_#000] inline-block mt-4">
-                    Verify.
-                  </span>
-                </h2>
-                <p className="text-xl md:text-2xl font-semibold max-w-2xl mx-auto lg:mx-0 !leading-relaxed">
-                  Integrity by default. Powered by STARKs. A permissionless marketplace for digital services.
-                </p>
-                <div className="flex flex-wrap justify-center lg:justify-start gap-4 pt-6">
-                  <BrutalButton icon={Terminal} variant="secondary">
-                    Explore Market
-                  </BrutalButton>
-                  <BrutalButton variant="outline" icon={Database}>
-                    DVM Specs
-                  </BrutalButton>
+          {selectedService ? (
+            <ServicePage key="service-page" service={selectedService} onBack={() => setSelectedService(null)} onJobRequest={handleJobRequest} />
+          ) : (
+            <motion.div key="main-content">
+              <motion.section className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-center py-16 md:py-24" initial="hidden" animate="visible" variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } }}>
+                <motion.div className="lg:col-span-3 space-y-8 text-center lg:text-left" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 }}}>
+                  <Badge color="bg-nostr-purple text-white" className="mx-auto lg:mx-0">Stark-Powered Trust</Badge>
+                  <h2 className="text-7xl md:text-8xl font-black leading-none uppercase text-black tracking-tighter">
+                    Don't Trust. <br />
+                    <span className="bg-paper px-4 text-black shadow-[8px_8px_0px_0px_#000] inline-block mt-4">Verify.</span>
+                  </h2>
+                  <p className="text-xl md:text-2xl font-semibold max-w-2xl mx-auto lg:mx-0 !leading-relaxed">
+                    Integrity by default. Powered by STARKs. A permissionless marketplace for digital services.
+                  </p>
+                  <div className="flex flex-wrap justify-center lg:justify-start gap-4 pt-6">
+                    <BrutalButton icon={Terminal} variant="secondary">Explore Market</BrutalButton>
+                    <BrutalButton variant="outline" icon={Database}>DVM Specs</BrutalButton>
+                  </div>
+                </motion.div>
+                <div className="lg:col-span-2 relative hidden lg:block h-96">
+                  <SoulGeometry />
                 </div>
-              </motion.div>
+              </motion.section>
 
-              <div className="lg:col-span-2 relative hidden lg:block h-96">
-                <SoulGeometry />
-              </div>
-            </motion.section>
-
-            {/* --- Dashboard Section --- */}
-            <motion.section 
-              className="border-y-4 border-black bg-nostr-purple text-white py-12"
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-            >
-              <div className="max-w-7xl mx-auto px-4 md:px-8">
-                <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-white pb-8 mb-10 gap-8">
-                  <div className="flex border-3 border-black shadow-[5px_5px_0_#000]">
-                      <button 
-                        onClick={() => setActiveTab('market')}
-                        className={`text-xl font-bold uppercase px-8 py-4 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
-                      >
-                        Marketplace
-                      </button>
-                      <button 
-                        onClick={() => setActiveTab('jobs')}
-                        className={`text-xl font-bold uppercase px-8 py-4 transition-colors relative ${activeTab === 'jobs' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}
-                      >
+              <motion.section className="border-y-4 border-black bg-nostr-purple text-white py-12" initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }}>
+                <div className="max-w-7xl mx-auto px-4 md:px-8">
+                  <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-white pb-8 mb-10 gap-8">
+                    <div className="flex border-3 border-black shadow-[5px_5px_0_#000]">
+                      <button onClick={() => setActiveTab('market')} className={`text-xl font-bold uppercase px-8 py-4 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}>Marketplace</button>
+                      <button onClick={() => setActiveTab('jobs')} className={`text-xl font-bold uppercase px-8 py-4 transition-colors relative ${activeTab === 'jobs' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}>
                         Live Jobs 
-                        <span className="absolute -top-3 -right-3 text-sm h-8 w-8 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-3 border-black font-bold rounded-full">
-                          {jobs.length}
-                        </span>
+                        <span className="absolute -top-3 -right-3 text-sm h-8 w-8 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-3 border-black font-bold rounded-full">{jobs.length}</span>
                       </button>
-                  </div>
-                  
-                  <div className="w-full md:w-auto relative">
+                    </div>
+                    <div className="w-full md:w-auto relative">
                       <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-black/40" size={24} strokeWidth={3}/>
-                      <input 
-                        type="text" 
-                        placeholder="Find a DVM by name or tag..." 
-                        className="w-full md:w-96 border-3 border-black py-4 pl-16 pr-6 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#000] bg-paper text-black"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
+                      <input type="text" placeholder="Find a DVM by name or tag..." className="w-full md:w-96 border-3 border-black py-4 pl-16 pr-6 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#000] bg-paper text-black" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                    </div>
                   </div>
-                </div>
 
-                {/* --- Tab Content --- */}
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeTab}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="min-h-[400px]"
-                  >
-                    {activeTab === 'market' ? (
-                      <motion.div 
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10"
-                        variants={{
-                          visible: { transition: { staggerChildren: 0.05 } }
-                        }}
-                        initial="hidden"
-                        animate="visible"
-                      >
-                        {filteredServices.map((service) => (
-                          <motion.div 
-                            key={service.id} 
-                            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
-                          >
-                            <BrutalCard onClick={() => setSelectedService(service)} className="h-full flex flex-col group cursor-pointer transition-all duration-100 hover:shadow-[12px_12px_0px_0px_#000] !shadow-nostr-purple-dark bg-paper transform-gpu hover:-translate-y-1">
-                              <div className="flex justify-between items-start mb-4">
-                                <div className="p-3 border-3 border-black bg-stark-orange shadow-[4px_4px_0_#000]">
-                                  <service.icon size={28} strokeWidth={2.5} className="text-black"/>
+                  <AnimatePresence mode="wait">
+                    <motion.div key={activeTab} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.2 }} className="min-h-[400px]">
+                      {activeTab === 'market' ? (
+                        <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10" variants={{ visible: { transition: { staggerChildren: 0.05 } }}} initial="hidden" animate="visible">
+                          {filteredServices.map((service) => (
+                            <motion.div key={service.id} variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
+                              <BrutalCard onClick={() => setSelectedService(service)} className="h-full flex flex-col group cursor-pointer transition-all duration-100 hover:shadow-[12px_12px_0px_0px_#000] !shadow-nostr-purple-dark bg-paper transform-gpu hover:-translate-y-1">
+                                <div className="flex justify-between items-start mb-4">
+                                  <div className="p-3 border-3 border-black bg-stark-orange shadow-[4px_4px_0_#000]"><service.icon size={28} strokeWidth={2.5} className="text-black"/></div>
+                                  <Badge color="bg-bitcoin-gold text-black">{service.price}</Badge>
                                 </div>
-                                <Badge color="bg-bitcoin-gold text-black">{service.price}</Badge>
-                              </div>
-                              
-                              <h3 className="text-2xl font-black uppercase tracking-tight mb-2 text-black">{service.name}</h3>
-                              <p className="text-base font-medium mb-4 flex-grow text-black/70">{service.description}</p>
-                              
-                              <div className="space-y-3 font-mono text-sm border-t-2 border-black pt-4 mt-auto">
-                                <div className="flex justify-between">
-                                  <span className="text-black/60">PROVIDER:</span>
-                                  <span className="font-bold truncate text-black">{service.provider}</span>
+                                <h3 className="text-2xl font-black uppercase tracking-tight mb-2 text-black">{service.name}</h3>
+                                <p className="text-base font-medium mb-4 flex-grow text-black/70">{service.description}</p>
+                                <div className="space-y-3 font-mono text-sm border-t-2 border-black pt-4 mt-auto">
+                                  <div className="flex justify-between"><span className="text-black/60">PROVIDER:</span><span className="font-bold truncate text-black">{service.provider}</span></div>
+                                  <div className="flex justify-between"><span className="text-black/60">LATENCY:</span><span className="font-bold text-black">{service.latency}</span></div>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span className="text-black/60">LATENCY:</span>
-                                  <span className="font-bold text-black">{service.latency}</span>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                {service.tags.map(tag => (
-                                  <Badge key={tag} color="bg-stark-orange text-black">#{tag}</Badge>
-                                ))}
-                              </div>
-                            </BrutalCard>
-                          </motion.div>
-                        ))}
-                        {filteredServices.length === 0 && (
-                          <div className="col-span-full text-center py-16">
-                            <p className="text-2xl font-bold text-white">No services found.</p>
-                            <p className="text-white/70">Try a different search query.</p>
-                          </div>
-                        )}
-                      </motion.div>
-                    ) : (
-                      <div className="space-y-6">
-                        <AnimatePresence>
-                          {jobs.map((job) => (
-                            <motion.div 
-                              key={job.id} 
-                              layout
-                              initial={{ opacity: 0, y: -20 }} 
-                              animate={{ opacity: 1, y: 0 }} 
-                              exit={{ opacity: 0, y: 20 }}
-                              transition={{ duration: 0.3 }}
-                            >
-                              <BrutalCard color="bg-paper-subtle" className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 !shadow-nostr-purple-dark">
-                                <div className="flex items-center gap-5 w-full lg:w-auto">
-                                  <div className="p-3 border-3 border-black bg-nostr-purple shadow-[3px_3px_0_#000]">
-                                    <Cpu size={28} strokeWidth={3} className="text-white"/>
-                                  </div>
-                                  <div className="flex-grow">
-                                    <div className="font-black text-xl uppercase text-black">
-                                      {MOCK_SERVICES.find(s => s.id === job.serviceId)?.name}
-                                    </div>
-                                    <div className="font-mono text-sm text-black/60 flex items-center gap-2">
-                                      <span>ID: {job.id}</span>
-                                      <span className="text-black/40">•</span>
-                                      <span>{job.timestamp}</span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto self-end">
-                                  {job.status === 'processing' && job.progress !== undefined && (
-                                    <div className="w-full sm:w-32 h-8 border-2 border-black bg-white relative">
-                                      <div className="absolute inset-0 bg-blue-300" style={{ width: `${job.progress}%`}}></div>
-                                      <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-black">
-                                        {Math.round(job.progress)}%
-                                      </div>
-                                    </div>
-                                  )}
-                                  {job.proofHash && (
-                                    <div className="font-mono text-sm bg-gray-100 p-2 border-2 border-black truncate flex-grow text-center">
-                                      HASH: <span className="font-bold">{job.proofHash}</span>
-                                    </div>
-                                  )}
-                                  <StatusIndicator status={job.status} />
-                                  <BrutalButton variant="outline" className="p-3 w-full sm:w-auto !shadow-nostr-purple-dark">
-                                    <ChevronRight size={24} strokeWidth={3}/>
-                                  </BrutalButton>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                  {service.tags.map(tag => (<Badge key={tag} color="bg-stark-orange-light text-stark-orange-dark">#{tag}</Badge>))}
                                 </div>
                               </BrutalCard>
                             </motion.div>
                           ))}
-                        </AnimatePresence>
-                        <div className="border-4 border-black border-dashed p-12 text-center bg-paper/20">
-                          <p className="text-lg font-bold text-white/50 animate-pulse">Listening for new DVM events (Kind 6600)...</p>
+                          {filteredServices.length === 0 && (
+                            <div className="col-span-full text-center py-16"><p className="text-2xl font-bold text-white">No services found.</p><p className="text-white/70">Try a different search query.</p></div>
+                          )}
+                        </motion.div>
+                      ) : (
+                        <div className="space-y-6">
+                          <AnimatePresence>
+                            {jobs.map((job) => (
+                              <motion.div key={job.id} layout initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.3 }}>
+                                <BrutalCard color="bg-paper-subtle" className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 !shadow-nostr-purple-dark">
+                                  <div className="flex items-center gap-5 w-full lg:w-auto">
+                                    <div className="p-3 border-3 border-black bg-nostr-purple shadow-[3px_3px_0_#000]"><Cpu size={28} strokeWidth={3} className="text-white"/></div>
+                                    <div className="flex-grow">
+                                      <div className="font-black text-xl uppercase text-black">{MOCK_SERVICES.find(s => s.id === job.serviceId)?.name}</div>
+                                      <div className="font-mono text-sm text-black/60 flex items-center gap-2">
+                                        <span>ID: {job.id}</span><span className="text-black/40">•</span><span>{job.timestamp}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto self-end">
+                                    {job.status === 'processing' && job.progress !== undefined && (
+                                      <div className="w-full sm:w-32 h-8 border-2 border-black bg-white relative"><div className="absolute inset-0 bg-blue-300" style={{ width: `${job.progress}%`}}></div><div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-black">{Math.round(job.progress)}%</div></div>
+                                    )}
+                                    {job.proofHash && (<div className="font-mono text-sm bg-gray-100 p-2 border-2 border-black truncate flex-grow text-center">HASH: <span className="font-bold">{job.proofHash}</span></div>)}
+                                    <StatusIndicator status={job.status} />
+                                    <BrutalButton variant="outline" className="p-3 w-full sm:w-auto !shadow-nostr-purple-dark" onClick={() => setVerifyingJob(job)}><ChevronRight size={24} strokeWidth={3}/></BrutalButton>
+                                  </div>
+                                </BrutalCard>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                          <div className="border-4 border-black border-dashed p-12 text-center bg-paper/20"><p className="text-lg font-bold text-white/50 animate-pulse">Listening for new DVM events (Kind 6600)...</p></div>
                         </div>
-                      </div>
-                    )}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-                          </motion.section>          </motion.div>
-        )}
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </motion.section>
+            </motion.div>
+          )}
         </AnimatePresence>
 
-        {/* --- Footer --- */}
         <footer className="border-t-4 border-black mt-24 bg-paper py-12">
           <div className="max-w-7xl mx-auto px-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-                <div className="lg:col-span-2">
-                  <h2 className="text-4xl font-black uppercase mb-4 tracking-tighter">SoulSociety.</h2>
-                  <p className="text-lg font-semibold max-w-md !leading-relaxed">
-                    A permissionless marketplace of digital services, providing integrity by default thanks to the power of STARKs.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg border-b-3 border-black inline-block mb-4 uppercase tracking-wider">Protocol</h3>
-                  <ul className="space-y-3 text-base font-medium">
-                      <li><a href="#" className="hover:text-stark-orange">NIP-90 (DVMs)</a></li>
-                      <li><a href="#" className="hover:text-stark-orange">Circle STARKs</a></li>
-                      <li><a href="#" className="hover:text-stark-orange">Cairo Lang</a></li>
-                  </ul>
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg border-b-3 border-black inline-block mb-4 uppercase tracking-wider">Community</h3>
-                  <ul className="space-y-3 text-base font-medium">
-                      <li><a href="#" className="hover:text-stark-orange">Github</a></li>
-                      <li><a href="#" className="hover:text-stark-orange">Nostr</a></li>
-                      <li><a href="#" className="hover:text-stark-orange">Telegram</a></li>
-                  </ul>
-                </div>
+              <div className="lg:col-span-2"><h2 className="text-4xl font-black uppercase mb-4 tracking-tighter">SoulSociety.</h2><p className="text-lg font-semibold max-w-md !leading-relaxed">A permissionless marketplace of digital services, providing integrity by default thanks to the power of STARKs.</p></div>
+              <div>
+                <h3 className="font-bold text-lg border-b-3 border-black inline-block mb-4 uppercase tracking-wider">Protocol</h3>
+                <ul className="space-y-3 text-base font-medium">
+                  <li><a href="#" className="hover:text-stark-orange">NIP-90 (DVMs)</a></li>
+                  <li><a href="#" className="hover:text-stark-orange">Circle STARKs</a></li>
+                  <li><a href="#" className="hover:text-stark-orange">Cairo Lang</a></li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-bold text-lg border-b-3 border-black inline-block mb-4 uppercase tracking-wider">Community</h3>
+                <ul className="space-y-3 text-base font-medium">
+                  <li><a href="#" className="hover:text-stark-orange">Github</a></li>
+                  <li><a href="#" className="hover:text-stark-orange">Nostr</a></li>
+                  <li><a href="#" className="hover:text-stark-orange">Telegram</a></li>
+                </ul>
+              </div>
             </div>
-            <div className="mt-16 pt-8 border-t-2 border-black border-dashed font-mono text-sm text-center md:text-left text-black/60">
-                © 2025 SOULSOCIETY. NO RIGHTS RESERVED. OPEN SOURCE.
-            </div>
+            <div className="mt-16 pt-8 border-t-2 border-black border-dashed font-mono text-sm text-center md:text-left text-black/60">© 2025 SOULSOCIETY. NO RIGHTS RESERVED. OPEN SOURCE.</div>
           </div>
         </footer>
       </main>
+      <AnimatePresence>
+        {verifyingJob && <ProofModal job={verifyingJob} onClose={() => setVerifyingJob(null)} />}
+      </AnimatePresence>
     </div>
   );
 }
