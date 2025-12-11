@@ -595,7 +595,7 @@ export default function App() {
 
                               <div className="mt-4 flex flex-wrap gap-2">
                                 {service.tags.map(tag => (
-                                  <Badge key={tag} color="bg-stark-orange-light text-stark-orange-dark">#{tag}</Badge>
+                                  <Badge key={tag} color="bg-stark-orange text-black">#{tag}</Badge>
                                 ))}
                               </div>
                             </BrutalCard>
