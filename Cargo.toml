@@ -1,0 +1,55 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/provider",
+    "crates/soul-core",
+    "crates/soul-prover",
+    "crates/soul-wasm",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/AbdelStark/SoulSociety"
+authors = ["Abdel <abdel@starkware.co>"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Nostr
+nostr-sdk = "0.35"
+nostr = "0.35"
+
+# Crypto
+hex = "0.4"
+
+# WASM
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["console"] }
+console_error_panic_hook = "0.1"
+
+# Testing
+tokio-test = "0.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[profile.dev]
+opt-level = 1

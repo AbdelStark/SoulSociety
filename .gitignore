@@ -1,5 +1,30 @@
+# =============================================================================
+# Soul Society Monorepo .gitignore
+# =============================================================================
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
+.turbo/
+
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# WASM
+crates/soul-wasm/pkg/
+
+# Cairo
+crates/soul-cairo/target/
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,19 +32,39 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Environment
+.env
+.env.local
+.env.*.local
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
+!.vscode/settings.json
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-.ai
+
+# AI context (reference only)
+.ai/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Misc
+*.pem
+*.key
+.cache/
+tmp/

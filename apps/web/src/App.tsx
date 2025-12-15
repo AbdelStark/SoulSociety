@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Shield, 
-  Cpu, 
-  Zap, 
-  CheckCircle, 
-  Clock, 
-  Search, 
-  Menu, 
-  X, 
-  ArrowRight,
+import {
+  Shield,
+  Cpu,
+  Zap,
+  CheckCircle,
+  Clock,
+  Search,
+  Menu,
+  X,
   Database,
   Terminal,
-  Activity,
   ChevronRight,
-  GitCommit,
-  Layers,
   FileText,
   ImageIcon,
   Languages,
@@ -124,23 +120,25 @@ const MOCK_JOBS: Job[] = [
 
 // --- Components ---
 
-const BrutalButton = ({ 
-  children, 
-  onClick, 
-  variant = 'primary', 
+const BrutalButton = ({
+  children,
+  onClick,
+  variant = 'primary',
   className = '',
   icon: Icon,
   disabled = false,
-}: { 
-  children: React.ReactNode; 
-  onClick?: () => void; 
+  type = 'button',
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   className?: string;
   icon?: any;
   disabled?: boolean;
+  type?: 'button' | 'submit' | 'reset';
 }) => {
   const baseStyles = "relative font-bold border-3 border-black px-6 py-3 transition-all duration-100 flex items-center justify-center gap-2 uppercase tracking-wider text-sm transform-gpu";
-  
+
   const variants = {
     primary: "bg-stark-orange text-black shadow-[5px_5px_0px_0px_#000] hover:shadow-[7px_7px_0px_0px_#000] enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
     secondary: "bg-nostr-purple text-black shadow-[5px_5px_0px_0px_#000] hover:shadow-[7px_7px_0px_0px_#000] enabled:active:translate-x-[3px] enabled:active:translate-y-[3px] enabled:active:shadow-none",
@@ -151,9 +149,10 @@ const BrutalButton = ({
   const disabledStyles = "disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none";
 
   return (
-    <motion.button 
-      onClick={onClick} 
-      className={`${baseStyles} ${variants[variant]} ${className} ${disabledStyles}`} 
+    <motion.button
+      type={type}
+      onClick={onClick}
+      className={`${baseStyles} ${variants[variant]} ${className} ${disabledStyles}`}
       disabled={disabled}
       whileHover={{ scale: disabled ? 1 : 1.05 }}
       whileTap={{ scale: disabled ? 1 : 0.95 }}

@@ -5,20 +5,20 @@
 ## Phase 0: Foundation (Week 1)
 
 ### Monorepo Setup
-- [ ] Create workspace `Cargo.toml` with all crate members
-- [ ] Create root `package.json` with pnpm workspaces
-- [ ] Configure `turbo.json` for build orchestration
-- [ ] Create `pnpm-workspace.yaml`
-- [ ] Set up `rustfmt.toml` and `.prettierrc`
-- [ ] Create `.gitignore` with appropriate patterns
+- [x] Create workspace `Cargo.toml` with all crate members
+- [x] Create root `package.json` with pnpm workspaces
+- [x] Configure `turbo.json` for build orchestration
+- [x] Create `pnpm-workspace.yaml`
+- [x] Set up `rustfmt.toml` and `.prettierrc`
+- [x] Create `.gitignore` with appropriate patterns
 
 ### Directory Structure
-- [ ] Create `apps/` directory
-- [ ] Create `crates/` directory  
-- [ ] Create `packages/` directory
-- [ ] Create `infra/` directory
-- [ ] Create `scripts/` directory
-- [ ] Create `docs/` directory
+- [x] Create `apps/` directory
+- [x] Create `crates/` directory
+- [x] Create `packages/` directory
+- [x] Create `infra/` directory
+- [x] Create `scripts/` directory
+- [x] Create `docs/` directory
 
 ### Docker & Infrastructure
 - [ ] Create `infra/docker/Dockerfile.provider`
@@ -35,10 +35,10 @@
 - [ ] Add Docker build job
 
 ### Migrate Existing UI
-- [ ] Move existing React code to `apps/web/`
-- [ ] Update import paths
-- [ ] Verify `pnpm dev` works
-- [ ] Verify `pnpm build` works
+- [x] Move existing React code to `apps/web/`
+- [x] Update import paths
+- [x] Verify `pnpm dev` works
+- [x] Verify `pnpm build` works
 
 ### Documentation
 - [ ] Create `docs/architecture.md`
