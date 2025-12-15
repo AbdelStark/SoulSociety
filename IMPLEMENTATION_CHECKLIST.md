@@ -66,9 +66,9 @@
 - [x] Add mock implementations for testing
 
 ### soul-cairo Crate (Scaffold)
-- [ ] Create `crates/soul-cairo/Scarb.toml`
-- [ ] Set up Cairo project structure
-- [ ] Add test framework config
+- [x] Create `crates/soul-cairo/Scarb.toml`
+- [x] Set up Cairo project structure
+- [x] Add test framework config
 
 ### Provider Application (Scaffold)
 - [x] Create `apps/provider/Cargo.toml`
