@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Shield,
   Cpu,
@@ -11,20 +11,26 @@ import {
   Database,
   Terminal,
   ChevronRight,
-  FileText,
-  ImageIcon,
-  Languages,
   ArrowLeft,
   Loader2,
   Book,
   Code,
   LineChart,
   FileCheck,
-  FileX
+  FileX,
+  Hash,
+  Binary,
+  GitBranch
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { JobStatus, type JobInput } from '@soul-society/sdk';
+import { ServiceType } from './lib/nostr';
+import { useNostrClient } from './hooks/useNostrClient';
+import { useJobSubmission } from './hooks/useJobSubmission';
+import { useJobs, type Job } from './stores/jobStore';
+import { useTruncatedPubkey } from './stores/walletStore';
 
-// --- Types & Mock Data ---
+// --- Types ---
 
 type FormField = {
   name: string;
@@ -35,87 +41,66 @@ type FormField = {
 
 type Service = {
   id: string;
+  serviceType: ServiceType;
   name: string;
   description: string;
   provider: string;
-  price: string; // sats
+  price: string;
   latency: string;
   tags: string[];
   icon: React.ComponentType<{ size?: number, strokeWidth?: number, className?: string }>;
   formFields: FormField[];
 };
 
-type Job = {
-  id: string;
-  serviceId: string;
-  status: 'pending' | 'processing' | 'proven' | 'verified';
-  timestamp: string;
-  proofHash?: string;
-  jobData?: any;
-  resultData?: any;
-  progress?: number;
-};
+// --- Services Configuration ---
 
-const MOCK_SERVICES: Service[] = [
+const SERVICES: Service[] = [
   {
     id: 's1',
-    name: 'STWO Cairo Verifier',
-    description: 'Generates STARK proofs for Cairo assembly traces using the STWO prover.',
-    provider: 'npub...zk42',
-    price: '250 sats',
-    latency: '~12s',
-    tags: ['ZK-STARK', 'Cairo', 'Computation'],
-    icon: Cpu,
+    serviceType: ServiceType.Fibonacci,
+    name: 'Fibonacci Prover',
+    description: 'Computes the n-th Fibonacci number and generates a STARK proof of correct computation.',
+    provider: 'soul-provider',
+    price: '100 sats',
+    latency: '~5s',
+    tags: ['ZK-STARK', 'Math', 'Computation'],
+    icon: Binary,
     formFields: [
-      { name: 'cairoCode', label: 'Cairo Code', type: 'textarea', placeholder: 'Enter your Cairo code here...' }
+      { name: 'n', label: 'Fibonacci Index (n)', type: 'number', placeholder: 'Enter a number (e.g., 10)' }
     ]
   },
   {
     id: 's2',
-    name: 'Image Generation',
-    description: 'Generates an image from a text prompt using a diffusion model.',
-    provider: 'npub...ai88',
-    price: '1000 sats',
-    latency: '~30s',
-    tags: ['AI', 'Image'],
-    icon: ImageIcon,
+    serviceType: ServiceType.HashVerify,
+    name: 'Hash Verifier',
+    description: 'Verifies that a preimage hashes to a given hash value using Poseidon hash.',
+    provider: 'soul-provider',
+    price: '150 sats',
+    latency: '~3s',
+    tags: ['ZK-STARK', 'Crypto', 'Hash'],
+    icon: Hash,
     formFields: [
-      { name: 'prompt', label: 'Prompt', type: 'text', placeholder: 'e.g., "A cat wearing a wizard hat"' }
+      { name: 'hash', label: 'Expected Hash', type: 'text', placeholder: 'Enter the expected hash (hex)' },
+      { name: 'preimage', label: 'Preimage', type: 'text', placeholder: 'Enter the preimage to verify' }
     ]
   },
   {
     id: 's3',
-    name: 'Text Summarization',
-    description: 'Summarizes a long text into a few sentences.',
-    provider: 'npub...txt5',
-    price: '150 sats',
-    latency: '~5s',
-    tags: ['AI', 'Text'],
-    icon: FileText,
-    formFields: [
-      { name: 'textToSummarize', label: 'Text to Summarize', type: 'textarea', placeholder: 'Enter the text you want to summarize...' }
-    ]
-  },
-  {
-    id: 's4',
-    name: 'Translation',
-    description: 'Translates text from one language to another.',
-    provider: 'npub...lang2',
+    serviceType: ServiceType.MerkleProof,
+    name: 'Merkle Proof Verifier',
+    description: 'Verifies that a leaf is part of a Merkle tree given the root and proof path.',
+    provider: 'soul-provider',
     price: '200 sats',
-    latency: '~3s',
-    tags: ['AI', 'Translation'],
-    icon: Languages,
+    latency: '~4s',
+    tags: ['ZK-STARK', 'Merkle', 'Verification'],
+    icon: GitBranch,
     formFields: [
-      { name: 'textToTranslate', label: 'Text to Translate', type: 'text', placeholder: 'Enter text...' },
-      { name: 'targetLanguage', label: 'Target Language', type: 'text', placeholder: 'e.g., "Spanish"' }
+      { name: 'root', label: 'Merkle Root', type: 'text', placeholder: 'Enter the Merkle root (hex)' },
+      { name: 'leaf', label: 'Leaf Value', type: 'text', placeholder: 'Enter the leaf to verify' },
+      { name: 'proof', label: 'Proof Path', type: 'textarea', placeholder: 'Enter sibling hashes, one per line' },
+      { name: 'index', label: 'Leaf Index', type: 'number', placeholder: 'Enter the leaf index' }
     ]
   },
-];
-
-const MOCK_JOBS: Job[] = [
-  { id: 'job_8f7a...9c21', serviceId: 's1', status: 'verified', timestamp: '2 mins ago', proofHash: '0x7a...9f', resultData: { summary: "Cairo code verified" } },
-  { id: 'job_3b2c...1d44', serviceId: 's3', status: 'proven', timestamp: '5 mins ago', proofHash: '0x3b...1d', resultData: { summary: "This is a summary of the text." } },
-  { id: 'job_9e11...00p2', serviceId: 's2', status: 'processing', timestamp: 'Just now', progress: 60, resultData: { imageUrl: "https://placehold.co/600x400" } },
 ];
 
 // --- Components ---
@@ -133,7 +118,7 @@ const BrutalButton = ({
   onClick?: () => void;
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   className?: string;
-  icon?: any;
+  icon?: React.ComponentType<{ size?: number, strokeWidth?: number, className?: string }>;
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
 }) => {
@@ -175,41 +160,43 @@ const Badge = ({ children, color = "bg-gray-200", className = "" }: { children: 
   </span>
 );
 
-const StatusIndicator = ({ status }: { status: Job['status'] }) => {
-  const styles = {
-    pending: { color: 'bg-bitcoin-gold-light text-bitcoin-gold-dark', icon: Clock, text: 'PENDING' },
-    processing: { color: 'bg-blue-200 text-blue-800 animate-pulse', icon: Loader2, text: 'COMPUTING' },
-    proven: { color: 'bg-nostr-purple-light text-nostr-purple-dark', icon: Shield, text: 'PROVEN' },
-    verified: { color: 'bg-valid-green-light text-valid-green-dark', icon: CheckCircle, text: 'VERIFIED' },
+const StatusIndicator = ({ status }: { status: JobStatus }) => {
+  const styles: Record<JobStatus, { color: string, icon: React.ComponentType<{ size?: number, strokeWidth?: number, className?: string }>, text: string }> = {
+    [JobStatus.Pending]: { color: 'bg-bitcoin-gold-light text-bitcoin-gold-dark', icon: Clock, text: 'PENDING' },
+    [JobStatus.Processing]: { color: 'bg-blue-200 text-blue-800 animate-pulse', icon: Loader2, text: 'COMPUTING' },
+    [JobStatus.Proven]: { color: 'bg-nostr-purple-light text-nostr-purple-dark', icon: Shield, text: 'PROVEN' },
+    [JobStatus.Verified]: { color: 'bg-valid-green-light text-valid-green-dark', icon: CheckCircle, text: 'VERIFIED' },
+    [JobStatus.Failed]: { color: 'bg-red-200 text-red-800', icon: X, text: 'FAILED' },
   };
 
-  const { color, icon: Icon, text } = styles[status];
+  const styleConfig = styles[status] || styles[JobStatus.Pending];
+  const { color, icon: Icon, text } = styleConfig;
 
   return (
     <div className={`flex items-center gap-2 border-3 border-black px-3 py-1.5 ${color}`}>
-      <Icon size={16} strokeWidth={3} className={status === 'processing' ? 'animate-spin' : ''}/>
+      <Icon size={16} strokeWidth={3} className={status === JobStatus.Processing ? 'animate-spin' : ''}/>
       <span className="font-bold text-sm uppercase">{text}</span>
     </div>
   );
 };
 
 const SoulGeometry = () => (
-  <motion.div 
+  <motion.div
     className="relative w-full h-full"
     initial="initial"
     animate="animate"
   >
-    <motion.div 
+    <motion.div
       className="absolute w-48 h-48 border-4 border-black bg-nostr-purple"
       variants={{ initial: { x: -100, y: -100, opacity: 0, rotate: -45 }, animate: { x: 0, y: 0, opacity: 1, rotate: 0 }}}
       transition={{ delay: 0.1, type: "spring", stiffness: 100 }}
     />
-    <motion.div 
+    <motion.div
       className="absolute right-0 bottom-0 w-48 h-48 border-4 border-black bg-paper"
       variants={{ initial: { x: 100, y: 100, opacity: 0, rotate: 45 }, animate: { x: 0, y: 0, opacity: 1, rotate: 0 }}}
       transition={{ delay: 0.2, type: "spring", stiffness: 100 }}
     />
-    <motion.div 
+    <motion.div
       className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 border-black bg-stark-orange flex items-center justify-center p-4"
       variants={{ initial: { scale: 0.5, opacity: 0 }, animate: { scale: 1, opacity: 1 }}}
       transition={{ delay: 0.4, duration: 0.5 }}
@@ -222,11 +209,12 @@ const SoulGeometry = () => (
       </div>
     </motion.div>
   </motion.div>
-)
+);
 
-const ServicePage = ({ service, onBack, onJobRequest }: { service: Service, onBack: () => void, onJobRequest: (job: Job) => void }) => {
-  const [formData, setFormData] = useState<any>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const ServicePage = ({ service, onBack }: { service: Service, onBack: () => void }) => {
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const { submit, isSubmitting, error } = useJobSubmission();
+  const { status: walletStatus } = useNostrClient();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -235,18 +223,38 @@ const ServicePage = ({ service, onBack, onJobRequest }: { service: Service, onBa
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    const newJob: Job = {
-      id: `job_${Math.random().toString(36).substr(2, 9)}`,
-      serviceId: service.id,
-      status: 'pending',
-      timestamp: 'Just now',
-      jobData: formData
-    };
-    onJobRequest(newJob);
+
+    // Build input based on service type
+    let input: JobInput;
+    switch (service.serviceType) {
+      case ServiceType.Fibonacci:
+        input = { type: ServiceType.Fibonacci, n: parseInt(formData.n || '0', 10) };
+        break;
+      case ServiceType.HashVerify:
+        input = { type: ServiceType.HashVerify, hash: formData.hash || '', preimage: formData.preimage || '' };
+        break;
+      case ServiceType.MerkleProof:
+        input = {
+          type: ServiceType.MerkleProof,
+          root: formData.root || '',
+          leaf: formData.leaf || '',
+          proof: formData.proof?.split('\n').filter(Boolean) || [],
+          index: parseInt(formData.index || '0', 10)
+        };
+        break;
+      default:
+        return;
+    }
+
+    const requestId = await submit(service.serviceType, input);
+    if (requestId) {
+      onBack();
+    }
   };
+
+  const isConnected = walletStatus === 'connected';
 
   return (
     <motion.div
@@ -257,7 +265,7 @@ const ServicePage = ({ service, onBack, onJobRequest }: { service: Service, onBa
     >
       <div className="mb-8">
         <BrutalButton onClick={onBack} variant="outline" className="!px-4">
-          <ArrowLeft size={20} strokeWidth={3}/> 
+          <ArrowLeft size={20} strokeWidth={3}/>
           <span className="ml-2">Back to Market</span>
         </BrutalButton>
       </div>
@@ -274,6 +282,12 @@ const ServicePage = ({ service, onBack, onJobRequest }: { service: Service, onBa
                 <p className="text-lg font-medium text-black/60 mt-1">{service.description}</p>
               </div>
             </div>
+
+            {error && (
+              <div className="mb-4 p-4 border-3 border-black bg-red-100 text-red-800 font-bold">
+                Error: {error}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-6 border-t-4 border-black border-dashed pt-6">
               {service.formFields.map(field => (
@@ -302,8 +316,19 @@ const ServicePage = ({ service, onBack, onJobRequest }: { service: Service, onBa
                   )}
                 </div>
               ))}
-              <BrutalButton type="submit" variant="primary" className="w-full text-lg" disabled={isSubmitting}>
-                {isSubmitting ? <><Loader2 className="animate-spin"/> Submitting...</> : <>Request Proof ({service.price})</>}
+              <BrutalButton
+                type="submit"
+                variant="primary"
+                className="w-full text-lg"
+                disabled={isSubmitting || !isConnected}
+              >
+                {!isConnected ? (
+                  'Connect Wallet First'
+                ) : isSubmitting ? (
+                  <><Loader2 className="animate-spin"/> Submitting...</>
+                ) : (
+                  <>Request Proof ({service.price})</>
+                )}
               </BrutalButton>
             </form>
           </BrutalCard>
@@ -337,8 +362,8 @@ const ServicePage = ({ service, onBack, onJobRequest }: { service: Service, onBa
         </div>
       </div>
     </motion.div>
-  )
-}
+  );
+};
 
 const ProofModal = ({ job, onClose }: { job: Job, onClose: () => void }) => {
   const [verificationSteps, setVerificationSteps] = useState<string[]>([]);
@@ -347,7 +372,7 @@ const ProofModal = ({ job, onClose }: { job: Job, onClose: () => void }) => {
   useEffect(() => {
     const steps = [
       'Fetching proof from decentralized storage...',
-      'Parsing proof data...',
+      'Parsing STARK proof data...',
       'Running verification algorithm...',
       'STARK proof is valid!',
     ];
@@ -364,17 +389,17 @@ const ProofModal = ({ job, onClose }: { job: Job, onClose: () => void }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const service = MOCK_SERVICES.find(s => s.id === job.serviceId);
+  const service = SERVICES.find(s => s.id === job.serviceId);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
       onClick={onClose}
     >
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.8, y: 50 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.8, y: 50 }}
@@ -385,39 +410,51 @@ const ProofModal = ({ job, onClose }: { job: Job, onClose: () => void }) => {
           <h2 className="text-3xl font-black uppercase">Proof Verification</h2>
           <button onClick={onClose} className="p-1 active:translate-x-[2px] active:translate-y-[2px]"><X size={32} /></button>
         </div>
-        
+
         <div className="space-y-4 font-mono text-sm border-y-3 border-black py-4">
           {verificationSteps.map((step, i) => (
-            <motion.div 
+            <motion.div
               key={i}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.1 }}
               className="flex items-center gap-3"
             >
-              {i < verificationSteps.length -1 ? <Loader2 className="animate-spin text-gray-500"/> : isVerified ? <FileCheck className="text-valid-green" /> : <FileX className="text-red-500" />}
+              {i < verificationSteps.length - 1 ? <Loader2 className="animate-spin text-gray-500"/> : isVerified ? <FileCheck className="text-valid-green" /> : <FileX className="text-red-500" />}
               <span>{step}</span>
             </motion.div>
           ))}
         </div>
-        
-        {isVerified && service && (
+
+        {isVerified && service && job.output && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6">
             <h3 className="text-2xl font-black uppercase mb-4">Job Result</h3>
             <BrutalCard color="bg-paper-subtle">
-              {service.id === 's2' && <img src={job.resultData.imageUrl} alt="Generated" className="border-2 border-black" />}
-              {service.id === 's3' && <p>{job.resultData.summary}</p>}
-              {service.id === 's4' && <p>{job.resultData.translatedText}</p>}
-              <div className="font-mono text-xs mt-4 pt-4 border-t-2 border-dashed border-black">
-                <p><strong>Proof Hash:</strong> {job.proofHash}</p>
-              </div>
+              <pre className="font-mono text-sm overflow-auto whitespace-pre-wrap">
+                {JSON.stringify(job.output, null, 2)}
+              </pre>
+              {job.proof && (
+                <div className="font-mono text-xs mt-4 pt-4 border-t-2 border-dashed border-black">
+                  <p><strong>Proof Commitment:</strong> {job.proof.commitment}</p>
+                  <p><strong>Proof Size:</strong> {job.proof.proofBytes?.length || 0} bytes</p>
+                </div>
+              )}
+            </BrutalCard>
+          </motion.div>
+        )}
+
+        {job.error && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6">
+            <h3 className="text-2xl font-black uppercase mb-4 text-red-600">Error</h3>
+            <BrutalCard color="bg-red-100">
+              <p className="font-mono text-red-800">{job.error}</p>
             </BrutalCard>
           </motion.div>
         )}
       </motion.div>
     </motion.div>
-  )
-}
+  );
+};
 
 // --- Main Application ---
 
@@ -425,48 +462,32 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'market' | 'jobs'>('market');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [walletConnected, setWalletConnected] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
   const [verifyingJob, setVerifyingJob] = useState<Job | null>(null);
 
-  const toggleWallet = () => setWalletConnected(!walletConnected);
+  const { status, connect, disconnect } = useNostrClient();
+  const truncatedPubkey = useTruncatedPubkey();
+  const jobs = useJobs();
 
-  const handleJobRequest = (newJob: Job) => {
-    const jobWithProgress = { ...newJob, progress: 0 };
-    setJobs(prevJobs => [jobWithProgress, ...prevJobs]);
-    setSelectedService(null);
-    setActiveTab('jobs');
+  const walletConnected = status === 'connected';
 
-    const duration = 10000;
-    const interval = 100;
-    let progress = 0;
+  const toggleWallet = useCallback(() => {
+    if (walletConnected) {
+      disconnect();
+    } else {
+      connect();
+    }
+  }, [walletConnected, connect, disconnect]);
 
-    const progressInterval = setInterval(() => {
-      progress += (interval / duration) * 100;
-      setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'processing', progress: Math.min(progress, 100) } : j));
-      
-      if (progress >= 100) {
-        clearInterval(progressInterval);
-        setTimeout(() => {
-          setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'proven', proofHash: `0x${Math.random().toString(16).substr(2, 8)}...`, resultData: { summary: "Job complete!", imageUrl: "https://placehold.co/600x400", translatedText: "Hola, mundo!" } } : j));
-        }, 1000);
-        setTimeout(() => {
-          setJobs(prevJobs => prevJobs.map(j => j.id === newJob.id ? { ...j, status: 'verified' } : j));
-        }, 2000);
-      }
-    }, interval);
-  };
-
-  const filteredServices = MOCK_SERVICES.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredServices = SERVICES.filter(s =>
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
     <div className="min-h-screen bg-stark-orange text-black font-sans selection:bg-nostr-purple selection:text-white">
       <div className="absolute inset-0 bg-grid-pattern opacity-30"></div>
-      
+
       <header className="relative sticky top-0 z-50 border-b-4 border-black bg-paper/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between p-4">
           <div className="flex items-center gap-4">
@@ -486,13 +507,13 @@ export default function App() {
 
           <div className="flex items-center gap-4">
              <div className="hidden md:block">
-                <BrutalButton 
-                  variant={walletConnected ? 'outline' : 'secondary'} 
+                <BrutalButton
+                  variant={walletConnected ? 'outline' : 'secondary'}
                   onClick={toggleWallet}
                   className="py-2"
                   icon={walletConnected ? CheckCircle : Zap}
                 >
-                  {walletConnected ? 'npub1...8z9' : 'Connect'}
+                  {walletConnected ? truncatedPubkey || 'Connected' : status === 'connecting' ? 'Connecting...' : 'Connect'}
                 </BrutalButton>
              </div>
              <button onClick={() => setSidebarOpen(true)} className="lg:hidden border-3 border-black p-2 bg-paper active:bg-gray-100 shadow-[3px_3px_0px_0px_#000] active:shadow-none active:translate-x-[3px] active:translate-y-[3px] transition-all">
@@ -528,7 +549,11 @@ export default function App() {
       <main className="relative max-w-7xl mx-auto p-4 md:p-8 space-y-24">
         <AnimatePresence mode="wait">
           {selectedService ? (
-            <ServicePage key="service-page" service={selectedService} onBack={() => setSelectedService(null)} onJobRequest={handleJobRequest} />
+            <ServicePage
+              key="service-page"
+              service={selectedService}
+              onBack={() => setSelectedService(null)}
+            />
           ) : (
             <motion.div key="main-content">
               <motion.section className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-center py-16 md:py-24" initial="hidden" animate="visible" variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } }}>
@@ -539,10 +564,10 @@ export default function App() {
                     <span className="bg-paper px-4 text-black shadow-[8px_8px_0px_0px_#000] inline-block mt-4">Verify.</span>
                   </h2>
                   <p className="text-xl md:text-2xl font-semibold max-w-2xl mx-auto lg:mx-0 !leading-relaxed">
-                    Integrity by default. Powered by STARKs. A permissionless marketplace for digital services.
+                    Integrity by default. Powered by STARKs. A permissionless marketplace for verifiable digital services.
                   </p>
                   <div className="flex flex-wrap justify-center lg:justify-start gap-4 pt-6">
-                    <BrutalButton icon={Terminal} variant="secondary">Explore Market</BrutalButton>
+                    <BrutalButton icon={Terminal} variant="secondary" onClick={() => setActiveTab('market')}>Explore Market</BrutalButton>
                     <BrutalButton variant="outline" icon={Database}>DVM Specs</BrutalButton>
                   </div>
                 </motion.div>
@@ -557,13 +582,15 @@ export default function App() {
                     <div className="flex border-3 border-black shadow-[5px_5px_0_#000]">
                       <button onClick={() => setActiveTab('market')} className={`text-xl font-bold uppercase px-8 py-4 border-r-3 border-black transition-colors ${activeTab === 'market' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}>Marketplace</button>
                       <button onClick={() => setActiveTab('jobs')} className={`text-xl font-bold uppercase px-8 py-4 transition-colors relative ${activeTab === 'jobs' ? 'bg-paper text-black' : 'bg-transparent hover:bg-white/10'}`}>
-                        Live Jobs 
-                        <span className="absolute -top-3 -right-3 text-sm h-8 w-8 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-3 border-black font-bold rounded-full">{jobs.length}</span>
+                        Live Jobs
+                        {jobs.length > 0 && (
+                          <span className="absolute -top-3 -right-3 text-sm h-8 w-8 flex items-center justify-center bg-bitcoin-gold text-black px-1.5 py-0.5 border-3 border-black font-bold rounded-full">{jobs.length}</span>
+                        )}
                       </button>
                     </div>
                     <div className="w-full md:w-auto relative">
                       <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-black/40" size={24} strokeWidth={3}/>
-                      <input type="text" placeholder="Find a DVM by name or tag..." className="w-full md:w-96 border-3 border-black py-4 pl-16 pr-6 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#000] bg-paper text-black" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                      <input type="text" placeholder="Find a service by name or tag..." className="w-full md:w-96 border-3 border-black py-4 pl-16 pr-6 font-bold text-lg focus:outline-none focus:bg-white transition-all shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[8px_8px_0px_0px_#000] bg-paper text-black" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                     </div>
                   </div>
 
@@ -597,31 +624,55 @@ export default function App() {
                       ) : (
                         <div className="space-y-6">
                           <AnimatePresence>
-                            {jobs.map((job) => (
-                              <motion.div key={job.id} layout initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.3 }}>
-                                <BrutalCard color="bg-paper-subtle" className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 !shadow-nostr-purple-dark">
-                                  <div className="flex items-center gap-5 w-full lg:w-auto">
-                                    <div className="p-3 border-3 border-black bg-nostr-purple shadow-[3px_3px_0_#000]"><Cpu size={28} strokeWidth={3} className="text-white"/></div>
-                                    <div className="flex-grow">
-                                      <div className="font-black text-xl uppercase text-black">{MOCK_SERVICES.find(s => s.id === job.serviceId)?.name}</div>
-                                      <div className="font-mono text-sm text-black/60 flex items-center gap-2">
-                                        <span>ID: {job.id}</span><span className="text-black/40">•</span><span>{job.timestamp}</span>
+                            {jobs.map((job) => {
+                              const service = SERVICES.find(s => s.id === job.serviceId);
+                              return (
+                                <motion.div key={job.id} layout initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.3 }}>
+                                  <BrutalCard color="bg-paper-subtle" className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 !shadow-nostr-purple-dark">
+                                    <div className="flex items-center gap-5 w-full lg:w-auto">
+                                      <div className="p-3 border-3 border-black bg-nostr-purple shadow-[3px_3px_0_#000]">
+                                        {service ? <service.icon size={28} strokeWidth={3} className="text-white"/> : <Cpu size={28} strokeWidth={3} className="text-white"/>}
+                                      </div>
+                                      <div className="flex-grow">
+                                        <div className="font-black text-xl uppercase text-black">{service?.name || 'Unknown Service'}</div>
+                                        <div className="font-mono text-sm text-black/60 flex items-center gap-2">
+                                          <span>ID: {job.id.substring(0, 16)}...</span>
+                                          <span className="text-black/40">•</span>
+                                          <span>{new Date(job.timestamp).toLocaleTimeString()}</span>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto self-end">
-                                    {job.status === 'processing' && job.progress !== undefined && (
-                                      <div className="w-full sm:w-32 h-8 border-2 border-black bg-white relative"><div className="absolute inset-0 bg-blue-300" style={{ width: `${job.progress}%`}}></div><div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-black">{Math.round(job.progress)}%</div></div>
-                                    )}
-                                    {job.proofHash && (<div className="font-mono text-sm bg-gray-100 p-2 border-2 border-black truncate flex-grow text-center">HASH: <span className="font-bold">{job.proofHash}</span></div>)}
-                                    <StatusIndicator status={job.status} />
-                                    <BrutalButton variant="outline" className="p-3 w-full sm:w-auto !shadow-nostr-purple-dark" onClick={() => setVerifyingJob(job)}><ChevronRight size={24} strokeWidth={3}/></BrutalButton>
-                                  </div>
-                                </BrutalCard>
-                              </motion.div>
-                            ))}
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto self-end">
+                                      {job.status === JobStatus.Processing && job.progress !== undefined && (
+                                        <div className="w-full sm:w-32 h-8 border-2 border-black bg-white relative">
+                                          <div className="absolute inset-0 bg-blue-300" style={{ width: `${job.progress}%`}}></div>
+                                          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-black">{Math.round(job.progress)}%</div>
+                                        </div>
+                                      )}
+                                      {job.proof && (
+                                        <div className="font-mono text-sm bg-gray-100 p-2 border-2 border-black truncate flex-grow text-center">
+                                          PROOF: <span className="font-bold">{job.proof.commitment?.substring(0, 12)}...</span>
+                                        </div>
+                                      )}
+                                      <StatusIndicator status={job.status} />
+                                      <BrutalButton variant="outline" className="p-3 w-full sm:w-auto !shadow-nostr-purple-dark" onClick={() => setVerifyingJob(job)}>
+                                        <ChevronRight size={24} strokeWidth={3}/>
+                                      </BrutalButton>
+                                    </div>
+                                  </BrutalCard>
+                                </motion.div>
+                              );
+                            })}
                           </AnimatePresence>
-                          <div className="border-4 border-black border-dashed p-12 text-center bg-paper/20"><p className="text-lg font-bold text-white/50 animate-pulse">Listening for new DVM events (Kind 6600)...</p></div>
+                          {jobs.length === 0 && (
+                            <div className="border-4 border-black border-dashed p-12 text-center bg-paper/20">
+                              <p className="text-lg font-bold text-white/70">No jobs yet.</p>
+                              <p className="text-white/50 mt-2">Submit a job to see it here!</p>
+                            </div>
+                          )}
+                          <div className="border-4 border-black border-dashed p-12 text-center bg-paper/20">
+                            <p className="text-lg font-bold text-white/50 animate-pulse">Listening for new DVM events...</p>
+                          </div>
                         </div>
                       )}
                     </motion.div>
@@ -635,7 +686,7 @@ export default function App() {
         <footer className="border-t-4 border-black mt-24 bg-paper py-12">
           <div className="max-w-7xl mx-auto px-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-              <div className="lg:col-span-2"><h2 className="text-4xl font-black uppercase mb-4 tracking-tighter">SoulSociety.</h2><p className="text-lg font-semibold max-w-md !leading-relaxed">A permissionless marketplace of digital services, providing integrity by default thanks to the power of STARKs.</p></div>
+              <div className="lg:col-span-2"><h2 className="text-4xl font-black uppercase mb-4 tracking-tighter">SoulSociety.</h2><p className="text-lg font-semibold max-w-md !leading-relaxed">A permissionless marketplace of verifiable digital services, providing integrity by default thanks to the power of STARKs.</p></div>
               <div>
                 <h3 className="font-bold text-lg border-b-3 border-black inline-block mb-4 uppercase tracking-wider">Protocol</h3>
                 <ul className="space-y-3 text-base font-medium">
