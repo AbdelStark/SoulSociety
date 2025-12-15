@@ -1,0 +1,39 @@
+[package]
+name = "soul-provider"
+description = "DVM Service Provider for Soul Society"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "soul-provider"
+path = "src/main.rs"
+
+[dependencies]
+# Core types
+soul-core = { path = "../../crates/soul-core" }
+soul-prover = { path = "../../crates/soul-prover" }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Nostr
+nostr-sdk = { workspace = true }
+nostr = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }

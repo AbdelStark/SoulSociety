@@ -51,19 +51,19 @@
 ## Phase 1: Core Infrastructure (Weeks 2-3)
 
 ### soul-core Crate
-- [ ] Create `crates/soul-core/Cargo.toml`
-- [ ] Implement `types.rs` (JobId, ServiceType, etc.)
-- [ ] Implement `nostr_events.rs` (event parsing)
-- [ ] Implement `constants.rs`
-- [ ] Add unit tests
-- [ ] Verify `cargo test -p soul-core` passes
+- [x] Create `crates/soul-core/Cargo.toml`
+- [x] Implement `types.rs` (JobId, ServiceType, etc.)
+- [x] Implement `nostr_events.rs` (event parsing)
+- [x] Implement `constants.rs`
+- [x] Add unit tests
+- [x] Verify `cargo test -p soul-core` passes
 
 ### soul-prover Crate (Scaffold)
-- [ ] Create `crates/soul-prover/Cargo.toml`
+- [x] Create `crates/soul-prover/Cargo.toml`
 - [ ] Add STWO dependency
-- [ ] Create prover interface trait
-- [ ] Create verifier interface trait
-- [ ] Add mock implementations for testing
+- [x] Create prover interface trait
+- [x] Create verifier interface trait
+- [x] Add mock implementations for testing
 
 ### soul-cairo Crate (Scaffold)
 - [ ] Create `crates/soul-cairo/Scarb.toml`
@@ -71,9 +71,9 @@
 - [ ] Add test framework config
 
 ### Provider Application (Scaffold)
-- [ ] Create `apps/provider/Cargo.toml`
-- [ ] Implement `main.rs` with CLI args
-- [ ] Implement config loading
+- [x] Create `apps/provider/Cargo.toml`
+- [x] Implement `main.rs` with CLI args
+- [x] Implement config loading
 - [ ] Implement basic Nostr subscription
 - [ ] Implement event publishing
 - [ ] Test with local relay

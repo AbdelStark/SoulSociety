@@ -1,0 +1,29 @@
+[package]
+name = "soul-prover"
+description = "STWO prover integration for Soul Society"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+# Core types
+soul-core = { path = "../soul-core" }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Crypto
+hex = { workspace = true }
+
+# TODO: Add STWO prover dependency when implementing
+# stwo-prover = { git = "https://github.com/starkware-libs/stwo" }
+
+[dev-dependencies]
+tokio-test = { workspace = true }

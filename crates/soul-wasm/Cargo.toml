@@ -1,0 +1,33 @@
+[package]
+name = "soul-wasm"
+description = "WASM bindings for Soul Society browser verification"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Core types
+soul-core = { path = "../soul-core" }
+soul-prover = { path = "../soul-prover" }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# WASM
+wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
+web-sys = { workspace = true }
+console_error_panic_hook = { workspace = true, optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[features]
+default = ["panic_hook"]
+panic_hook = ["console_error_panic_hook"]
