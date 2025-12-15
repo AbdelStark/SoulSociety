@@ -79,12 +79,12 @@
 - [ ] Test with local relay
 
 ### TypeScript SDK (Scaffold)
-- [ ] Create `packages/soul-sdk/package.json`
-- [ ] Create `packages/soul-sdk/tsconfig.json`
-- [ ] Implement Nostr client wrapper
-- [ ] Implement job submission
-- [ ] Implement result subscription
-- [ ] Add TypeScript types
+- [x] Create `packages/soul-sdk/package.json`
+- [x] Create `packages/soul-sdk/tsconfig.json`
+- [x] Implement Nostr client wrapper
+- [x] Implement job submission
+- [x] Implement result subscription
+- [x] Add TypeScript types
 
 ### Integration Testing
 - [ ] Provider subscribes to events ✓

@@ -1,0 +1,45 @@
+{
+  "name": "@soul-society/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Soul Society - Verifiable computation marketplace",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "nostr-tools": "^2.10.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {},
+  "keywords": [
+    "soul-society",
+    "nostr",
+    "stark",
+    "zk-proof",
+    "dvm"
+  ],
+  "author": "Abdel <abdel@starkware.co>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AbdelStark/SoulSociety"
+  }
+}
