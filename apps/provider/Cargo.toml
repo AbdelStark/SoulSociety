@@ -16,6 +16,9 @@ path = "src/main.rs"
 soul-core = { path = "../../crates/soul-core" }
 soul-prover = { path = "../../crates/soul-prover" }
 
+# UUID for result IDs
+uuid = { version = "1.0", features = ["v4"] }
+
 # Async runtime
 tokio = { workspace = true }
 

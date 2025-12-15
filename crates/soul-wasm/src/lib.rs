@@ -44,8 +44,8 @@ impl WasmVerifier {
             .map_err(|e| JsValue::from_str(&format!("Failed to parse public inputs: {}", e)))?;
 
         let proof = SerializedProof {
-            bytes: proof_bytes.to_vec(),
-            commitment: String::new(), // Commitment is derived from bytes
+            proof_bytes: proof_bytes.to_vec(),
+            commitment: format!("0x{}", hex::encode(&proof_bytes[..32.min(proof_bytes.len())])),
         };
 
         StwoVerifier::verify(&proof, &public_inputs)
