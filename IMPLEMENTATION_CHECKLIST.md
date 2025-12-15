@@ -21,10 +21,10 @@
 - [x] Create `docs/` directory
 
 ### Docker & Infrastructure
-- [ ] Create `infra/docker/Dockerfile.provider`
-- [ ] Create `infra/docker/Dockerfile.web`
-- [ ] Create `infra/docker/nginx.conf`
-- [ ] Create `infra/docker-compose.yml`
+- [x] Create `infra/docker/Dockerfile.provider`
+- [x] Create `infra/docker/Dockerfile.web`
+- [x] Create `infra/docker/nginx.conf`
+- [x] Create `infra/docker-compose.yml`
 - [ ] Test `docker compose up` works
 
 ### CI/CD

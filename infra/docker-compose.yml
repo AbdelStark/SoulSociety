@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # Local Nostr Relay
+  relay:
+    image: scsibug/nostr-rs-relay:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - relay_data:/usr/src/app/db
+    environment:
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # DVM Provider
+  provider:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.provider
+    depends_on:
+      relay:
+        condition: service_healthy
+    environment:
+      - NOSTR_RELAY_URL=ws://relay:8080
+      - RUST_LOG=info,soul_provider=debug
+      - PROVIDER_SECRET_KEY=${PROVIDER_SECRET_KEY:-}
+      - PROVIDER_NAME=soul-provider-1
+    volumes:
+      - provider_data:/app/data
+    restart: unless-stopped
+
+  # Web Frontend
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.web
+    ports:
+      - "5173:80"
+    depends_on:
+      - relay
+    environment:
+      - VITE_NOSTR_RELAY_URL=ws://localhost:8080
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # (Optional) Additional provider for redundancy
+  provider-2:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.provider
+    depends_on:
+      relay:
+        condition: service_healthy
+    environment:
+      - NOSTR_RELAY_URL=ws://relay:8080
+      - RUST_LOG=info
+      - PROVIDER_SECRET_KEY=${PROVIDER_SECRET_KEY_2:-}
+      - PROVIDER_NAME=soul-provider-2
+    profiles:
+      - multi-provider
+    restart: unless-stopped
+
+volumes:
+  relay_data:
+  provider_data:
+
+networks:
+  default:
+    name: soul-society-network
