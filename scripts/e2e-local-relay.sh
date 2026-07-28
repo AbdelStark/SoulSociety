@@ -19,9 +19,13 @@ require() {
 wait_for_http() {
   local url="$1"
   local attempts="${2:-60}"
+  local watched_pid="${3:-}"
   for ((attempt = 1; attempt <= attempts; attempt += 1)); do
     if curl --fail --silent "${url}" >/dev/null 2>&1; then
       return 0
+    fi
+    if [[ -n "${watched_pid}" ]] && ! kill -0 "${watched_pid}" >/dev/null 2>&1; then
+      return 1
     fi
     sleep 1
   done
@@ -59,6 +63,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
+cargo build --locked --release --package soul-provider --bin soul-provider
+
 docker run --detach --rm \
   --platform linux/amd64 \
   --name "${RELAY_CONTAINER}" \
@@ -93,7 +99,7 @@ RUST_LOG=info \
 cargo run --quiet --locked --release --package soul-provider >"${provider_log}" 2>&1 &
 provider_pid=$!
 
-if ! wait_for_http http://127.0.0.1:8081/healthz 120; then
+if ! wait_for_http http://127.0.0.1:8081/healthz 120 "${provider_pid}"; then
   cat "${provider_log}" >&2
   printf 'error: provider did not become ready\n' >&2
   exit 1
