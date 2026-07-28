@@ -28,10 +28,10 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
-    "nostr-tools": "2.10.4"
+    "nostr-tools": "2.24.1"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   },
   "peerDependencies": {},
   "keywords": [
