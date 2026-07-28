@@ -29,6 +29,7 @@ export type JobRecord = {
 };
 
 export type VerifierLoadState =
+  | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'ready'; verifier: ProofVerifier; manifest: VerifierManifest }
   | { status: 'error'; message: string };
@@ -82,17 +83,27 @@ function configuredProviders(): ProviderConfig {
   return { pubkeys: candidates as Hex64[] };
 }
 
-export function useSoulTerminal() {
+export function useSoulTerminal(verifierEnabled = true) {
   const relayConfig = useMemo(() => configuredRelays(), []);
   const providerConfig = useMemo(() => configuredProviders(), []);
   const [signer, setSigner] = useState<SoulSigner>();
   const [publicKey, setPublicKey] = useState<string>();
   const [signerError, setSignerError] = useState<string>();
-  const [verifierState, setVerifierState] = useState<VerifierLoadState>({ status: 'loading' });
+  const [loadedVerifierState, setVerifierState] = useState<VerifierLoadState>({ status: 'idle' });
+  const verifierState = useMemo<VerifierLoadState>(
+    () =>
+      verifierEnabled && loadedVerifierState.status === 'idle'
+        ? { status: 'loading' }
+        : loadedVerifierState,
+    [loadedVerifierState, verifierEnabled],
+  );
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const jobUnsubscribers = useRef(new Map<string, () => void>());
 
   useEffect(() => {
+    if (!verifierEnabled) {
+      return undefined;
+    }
     let active = true;
     void loadBrowserVerifier()
       .then(({ verifier, manifest }) => {
@@ -111,7 +122,7 @@ export function useSoulTerminal() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [verifierEnabled]);
 
   const client = useMemo(() => {
     if (

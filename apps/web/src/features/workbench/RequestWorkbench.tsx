@@ -198,9 +198,13 @@ export function RequestWorkbench({
   return (
     <section className="workbench" id="workbench" aria-labelledby="workbench-title">
       <header className="section-heading">
-        <p className="kicker">Field terminal / 001</p>
-        <h2 id="workbench-title">Prepare a signed request</h2>
-        <p>Nothing is published until your browser signer shows the exact event.</p>
+        <p className="kicker">Live protocol terminal / 04</p>
+        <h2 id="workbench-title">Issue a proof-carrying request</h2>
+        <p>
+          The public site loads the local verifier. Publishing also requires your
+          NIP-07 signer, a reviewed provider key, and an operational relay.
+          Nothing leaves the browser until the signer shows the exact event.
+        </p>
       </header>
 
       <div className="workbench__layout">
@@ -258,7 +262,7 @@ export function RequestWorkbench({
                 </button>
               )}
             </div>
-            <div>
+            <div role="status" aria-live="polite" aria-atomic="true">
               <span>Verifier</span>
               {verifierState.status === 'ready' ? (
                 <code dir="ltr" title={verifierState.manifest.program_hash}>
@@ -266,6 +270,8 @@ export function RequestWorkbench({
                 </code>
               ) : verifierState.status === 'loading' ? (
                 <em>loading reviewed build…</em>
+              ) : verifierState.status === 'idle' ? (
+                <em>loads as terminal approaches</em>
               ) : (
                 <em>unavailable</em>
               )}

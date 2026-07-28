@@ -34,6 +34,10 @@ export interface LoadedBrowserVerifier {
 
 let pendingVerifier: Promise<LoadedBrowserVerifier> | undefined;
 
+function verifierAssetUrl(filename: string): string {
+  return `${import.meta.env.BASE_URL}wasm/${filename}`;
+}
+
 function parseManifest(value: unknown): VerifierManifest {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error('The reviewed verifier manifest is not an object.');
@@ -77,7 +81,7 @@ function parseManifest(value: unknown): VerifierManifest {
 }
 
 async function load(): Promise<LoadedBrowserVerifier> {
-  const manifestResponse = await fetch('/wasm/programs.json', {
+  const manifestResponse = await fetch(verifierAssetUrl('programs.json'), {
     credentials: 'same-origin',
     cache: 'no-store',
   });
@@ -86,9 +90,9 @@ async function load(): Promise<LoadedBrowserVerifier> {
   }
   const manifest = parseManifest(await manifestResponse.json());
 
-  const moduleUrl = '/wasm/soul_wasm.js';
+  const moduleUrl = verifierAssetUrl('soul_wasm.js');
   const wasm = (await import(/* @vite-ignore */ moduleUrl)) as SoulWasmModule;
-  await wasm.default({ module_or_path: '/wasm/soul_wasm_bg.wasm' });
+  await wasm.default({ module_or_path: verifierAssetUrl('soul_wasm_bg.wasm') });
   const nativeVerifier = new wasm.WasmVerifier();
 
   return {
