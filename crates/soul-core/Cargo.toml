@@ -1,11 +1,16 @@
 [package]
 name = "soul-core"
-description = "Core types and utilities for Soul Society"
+description = "Soul Wire types, validation, and proof statements for verifiable Cairo jobs"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+
+[features]
+default = ["nostr-events"]
+nostr-events = ["dep:nostr"]
 
 [dependencies]
 # Serialization
@@ -14,10 +19,12 @@ serde_json = { workspace = true }
 
 # Error handling
 thiserror = { workspace = true }
-anyhow = { workspace = true }
 
-# Crypto
-hex = { workspace = true }
+# Signed Nostr event validation
+nostr = { workspace = true, optional = true }
+
+# Proof URL validation
+url = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }

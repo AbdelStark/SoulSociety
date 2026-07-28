@@ -1,93 +1,79 @@
-#!/bin/bash
-# Soul Society Development Setup Script
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
-# Colors
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+readonly NODE_VERSION="24.18.0"
+readonly PNPM_VERSION="11.17.0"
+readonly SCARB_VERSION="2.15.1"
+readonly WASM_PACK_VERSION="0.15.0"
+readonly ASDF_NODEJS_PLUGIN_REF="779c8dc84b3bdab38c2c80622d315c2c3267f74b"
+readonly ASDF_SCARB_PLUGIN_REF="875b155d8027370395420e330544abac56fe65ef"
 
-echo -e "${GREEN}🚀 Setting up Soul Society Development Environment${NC}"
-echo ""
-
-# Check prerequisites
-check_command() {
-    if ! command -v $1 &> /dev/null; then
-        echo -e "${RED}❌ $1 is required but not installed.${NC}"
-        return 1
-    fi
-    echo -e "${GREEN}✓ $1 found${NC}"
-    return 0
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
 }
 
-echo "Checking prerequisites..."
-check_command "node" || exit 1
-check_command "pnpm" || { echo -e "${YELLOW}Installing pnpm...${NC}"; npm install -g pnpm; }
-check_command "cargo" || exit 1
-check_command "scarb" || echo -e "${YELLOW}⚠️  Scarb not found - Cairo development will be limited${NC}"
-check_command "docker" || echo -e "${YELLOW}⚠️  Docker not found - containerized development unavailable${NC}"
+require() {
+  command -v "$1" >/dev/null 2>&1 || fail "$1 is required"
+}
 
-echo ""
+install_asdf_toolchains() {
+  command -v asdf >/dev/null 2>&1 || return 0
 
-# Create .env file if it doesn't exist
-if [ ! -f .env ]; then
-    echo -e "${YELLOW}Creating .env file from template...${NC}"
-    cp .env.example .env
+  if ! asdf plugin list | grep -qx nodejs; then
+    asdf plugin add nodejs https://github.com/asdf-vm/asdf-nodejs.git
+  fi
+  asdf plugin update nodejs "${ASDF_NODEJS_PLUGIN_REF}"
+  if ! asdf plugin list | grep -qx scarb; then
+    asdf plugin add scarb https://github.com/software-mansion/asdf-scarb.git
+  fi
+  asdf plugin update scarb "${ASDF_SCARB_PLUGIN_REF}"
+  asdf install nodejs "${NODE_VERSION}"
+  asdf install scarb "${SCARB_VERSION}"
+  asdf reshim
+}
 
-    # Generate provider secret keys
-    if command -v openssl &> /dev/null; then
-        PROVIDER_SK=$(openssl rand -hex 32)
-        PROVIDER_SK_2=$(openssl rand -hex 32)
+cd -- "${REPO_ROOT}"
 
-        # Update .env with generated keys
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s/^PROVIDER_SECRET_KEY=$/PROVIDER_SECRET_KEY=${PROVIDER_SK}/" .env
-            sed -i '' "s/^PROVIDER_SECRET_KEY_2=$/PROVIDER_SECRET_KEY_2=${PROVIDER_SK_2}/" .env
-        else
-            sed -i "s/^PROVIDER_SECRET_KEY=$/PROVIDER_SECRET_KEY=${PROVIDER_SK}/" .env
-            sed -i "s/^PROVIDER_SECRET_KEY_2=$/PROVIDER_SECRET_KEY_2=${PROVIDER_SK_2}/" .env
-        fi
-
-        echo -e "${GREEN}✓ Generated provider secret keys${NC}"
-    fi
+if [[ ! -f .env ]]; then
+  cp .env.example .env
+  chmod 600 .env
 fi
 
-echo ""
+require rustup
+rustup toolchain install nightly-2026-01-15 \
+  --profile minimal \
+  --component clippy,rustfmt \
+  --target wasm32-unknown-unknown
 
-# Install Node.js dependencies
-echo -e "${YELLOW}Installing Node.js dependencies...${NC}"
-pnpm install
-echo -e "${GREEN}✓ Node.js dependencies installed${NC}"
+install_asdf_toolchains
+require node
+require corepack
+require scarb
 
-echo ""
+[[ "$(node --version)" == "v${NODE_VERSION}" ]] \
+  || fail "Node ${NODE_VERSION} is required (found $(node --version))"
+[[ "$(scarb --version | awk 'NR == 1 {print $2}')" == "${SCARB_VERSION}" ]] \
+  || fail "Scarb ${SCARB_VERSION} is required"
 
-# Build Rust workspace
-echo -e "${YELLOW}Building Rust workspace...${NC}"
-cargo build
-echo -e "${GREEN}✓ Rust workspace built${NC}"
+corepack install --global "pnpm@${PNPM_VERSION}"
+if command -v asdf >/dev/null 2>&1; then
+  asdf reshim nodejs "${NODE_VERSION}"
+fi
+hash -r
+[[ "$(pnpm --version)" == "${PNPM_VERSION}" ]] \
+  || fail "pnpm ${PNPM_VERSION} is required (found $(pnpm --version))"
 
-echo ""
-
-# Build Cairo project if Scarb is available
-if command -v scarb &> /dev/null; then
-    echo -e "${YELLOW}Building Cairo programs...${NC}"
-    cd crates/soul-cairo && scarb build && cd ../..
-    echo -e "${GREEN}✓ Cairo programs built${NC}"
+if ! command -v wasm-pack >/dev/null 2>&1 \
+  || [[ "$(wasm-pack --version | awk '{print $2}')" != "${WASM_PACK_VERSION}" ]]; then
+  cargo install wasm-pack --version "${WASM_PACK_VERSION}" --locked
 fi
 
-echo ""
+pnpm install --frozen-lockfile
+(cd crates/soul-cairo && scarb build)
+cargo build --workspace --all-targets --locked
+"${SCRIPT_DIR}/build-wasm.sh"
 
-# Run tests
-echo -e "${YELLOW}Running tests...${NC}"
-cargo test --quiet
-pnpm -F @soul-society/web build --quiet 2>/dev/null || true
-echo -e "${GREEN}✓ Tests passed${NC}"
-
-echo ""
-echo -e "${GREEN}🎉 Setup complete!${NC}"
-echo ""
-echo "Next steps:"
-echo "  - Start development server: pnpm dev:web"
-echo "  - Run local stack: ./scripts/run-local.sh"
-echo "  - Build WASM: ./scripts/build-wasm.sh"
+printf '\nToolchains and dependencies are ready. Run ./scripts/check.sh next.\n'

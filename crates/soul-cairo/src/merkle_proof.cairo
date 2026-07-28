@@ -2,8 +2,8 @@
 //!
 //! Verifies that a leaf is included in a Merkle tree given the root and proof path.
 
-use core::poseidon::poseidon_hash_span;
 use core::array::{ArrayTrait, SpanTrait};
+use core::poseidon::poseidon_hash_span;
 
 /// Verify a Merkle proof
 ///
@@ -15,9 +15,7 @@ use core::array::{ArrayTrait, SpanTrait};
 ///
 /// # Returns
 /// `true` if the proof is valid, `false` otherwise
-pub fn verify_merkle_proof(
-    root: felt252, leaf: felt252, proof: Span<felt252>, index: u64
-) -> bool {
+pub fn verify_merkle_proof(root: felt252, leaf: felt252, proof: Span<felt252>, index: u64) -> bool {
     let computed_root = compute_root(leaf, proof, index);
     computed_root == root
 }
@@ -58,7 +56,7 @@ pub fn compute_root(leaf: felt252, proof: Span<felt252>, index: u64) -> felt252 
         current = poseidon_hash_span(data.span());
         idx = idx / 2;
         i += 1;
-    };
+    }
 
     current
 }
@@ -72,9 +70,14 @@ fn hash_pair(left: felt252, right: felt252) -> felt252 {
 }
 
 #[cfg(test)]
+pub fn hash_pair_for_test(left: felt252, right: felt252) -> felt252 {
+    hash_pair(left, right)
+}
+
+#[cfg(test)]
 mod tests {
-    use super::{verify_merkle_proof, compute_root, hash_pair};
     use core::array::ArrayTrait;
+    use super::{compute_root, hash_pair, verify_merkle_proof};
 
     #[test]
     fn test_single_element_tree() {

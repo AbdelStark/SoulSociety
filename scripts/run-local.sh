@@ -1,87 +1,73 @@
-#!/bin/bash
-# Soul Society Local Development Stack
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
-# Colors
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+readonly COMPOSE_FILE="${REPO_ROOT}/infra/docker-compose.yml"
+readonly PROGRAM_MANIFEST="${REPO_ROOT}/protocol/programs.json"
+readonly TEST_PROVIDER_SECRET="0000000000000000000000000000000000000000000000000000000000000002"
+readonly TEST_PROVIDER_PUBKEY="c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
 
-echo -e "${GREEN}🚀 Starting Soul Society Local Environment${NC}"
-echo ""
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
 
-# Check prerequisites
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Docker is required but not installed.${NC}"
-    exit 1
+require() {
+  command -v "$1" >/dev/null 2>&1 || fail "$1 is required"
+}
+
+read_env_value() {
+  local key="$1"
+  local file="$2"
+  local line
+  line="$(grep -E "^${key}=" "${file}" | tail -n 1 || true)"
+  printf '%s' "${line#*=}"
+}
+
+cd -- "${REPO_ROOT}"
+require docker
+docker compose version >/dev/null
+
+[[ -f "${PROGRAM_MANIFEST}" ]] \
+  || fail "trusted program manifest is missing; run ./scripts/generate-test-data.sh"
+
+program_hash="$(awk -F '"' '/"program_hash"/ {print $4; exit}' "${PROGRAM_MANIFEST}")"
+executable_sha256="$(awk -F '"' '/"artifact_sha256"/ {print $4; exit}' "${PROGRAM_MANIFEST}")"
+[[ "${program_hash}" =~ ^0x[0-9a-f]{64}$ ]] \
+  || fail "protocol/programs.json does not contain a canonical program hash"
+[[ "${executable_sha256}" =~ ^[0-9a-f]{64}$ ]] \
+  || fail "protocol/programs.json does not contain a canonical executable SHA-256"
+
+if [[ ! -f .env ]]; then
+  cp .env.example .env
 fi
 
-if ! docker compose version &> /dev/null; then
-    echo -e "${RED}Docker Compose is required but not installed.${NC}"
-    exit 1
+provider_key="$(read_env_value SOUL_PROVIDER_SECRET_KEY .env)"
+if [[ -z "${provider_key}" ]]; then
+  provider_key="${TEST_PROVIDER_SECRET}"
+fi
+[[ "${provider_key}" =~ ^[0-9a-f]{64}$ ]] \
+  || fail "SOUL_PROVIDER_SECRET_KEY must be 32 lowercase hex bytes"
+provider_pubkeys="$(read_env_value VITE_SOUL_PROVIDER_PUBKEYS .env)"
+if [[ -z "${provider_pubkeys}" ]]; then
+  provider_pubkeys="${TEST_PROVIDER_PUBKEY}"
+fi
+if [[ "${provider_key}" != "${TEST_PROVIDER_SECRET}" \
+  && "${provider_pubkeys}" == "${TEST_PROVIDER_PUBKEY}" ]]; then
+  fail "a custom provider secret requires its matching VITE_SOUL_PROVIDER_PUBKEYS"
 fi
 
-# Navigate to project root
-cd "$(dirname "$0")/.."
+export SOUL_PROVIDER_SECRET_KEY="${provider_key}"
+export SOUL_CAIRO_PROGRAM_HASH="${program_hash}"
+export SOUL_CAIRO_EXECUTABLE_SHA256="${executable_sha256}"
+export VITE_SOUL_PROVIDER_PUBKEYS="${provider_pubkeys}"
 
-# Generate secret keys if not present
-if [ ! -f .env ]; then
-    echo -e "${YELLOW}Generating .env file...${NC}"
-    cp .env.example .env
+docker compose --file "${COMPOSE_FILE}" config --quiet
+docker compose --file "${COMPOSE_FILE}" up --build --detach --wait --wait-timeout 300
 
-    # Generate Nostr secret keys
-    if command -v openssl &> /dev/null; then
-        PROVIDER_SK=$(openssl rand -hex 32)
-        PROVIDER_SK_2=$(openssl rand -hex 32)
-
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s/^PROVIDER_SECRET_KEY=$/PROVIDER_SECRET_KEY=${PROVIDER_SK}/" .env
-            sed -i '' "s/^PROVIDER_SECRET_KEY_2=$/PROVIDER_SECRET_KEY_2=${PROVIDER_SK_2}/" .env
-        else
-            sed -i "s/^PROVIDER_SECRET_KEY=$/PROVIDER_SECRET_KEY=${PROVIDER_SK}/" .env
-            sed -i "s/^PROVIDER_SECRET_KEY_2=$/PROVIDER_SECRET_KEY_2=${PROVIDER_SK_2}/" .env
-        fi
-
-        echo -e "${GREEN}✅ Generated new provider keys${NC}"
-    fi
-fi
-
-# Build WASM if needed
-if [ ! -d "apps/web/src/lib/verification/wasm" ]; then
-    echo -e "${YELLOW}Building WASM bindings...${NC}"
-    if [ -f "./scripts/build-wasm.sh" ]; then
-        ./scripts/build-wasm.sh || echo -e "${YELLOW}⚠️  WASM build skipped${NC}"
-    fi
-fi
-
-# Start services
-echo -e "${YELLOW}Starting Docker Compose...${NC}"
-docker compose -f infra/docker-compose.yml up --build -d
-
-# Wait for services
-echo -e "${YELLOW}Waiting for services to be healthy...${NC}"
-sleep 5
-
-# Check health
-echo ""
-if curl -s http://localhost:8080 > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ Nostr Relay: http://localhost:8080${NC}"
-else
-    echo -e "${YELLOW}⚠️  Relay still starting...${NC}"
-fi
-
-if curl -s http://localhost:5173 > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ Web UI: http://localhost:5173${NC}"
-else
-    echo -e "${YELLOW}⚠️  Web UI still starting...${NC}"
-fi
-
-echo ""
-echo -e "${GREEN}🎉 Soul Society is running!${NC}"
-echo ""
-echo "   Web UI: http://localhost:5173"
-echo "   Relay:  ws://localhost:8080"
-echo ""
-echo "To view logs: docker compose -f infra/docker-compose.yml logs -f"
-echo "To stop:      docker compose -f infra/docker-compose.yml down"
+printf '\nSoul Society is ready:\n'
+printf '  Web:      http://127.0.0.1:5173\n'
+printf '  Relay:    ws://127.0.0.1:8080\n'
+printf '  Provider: http://127.0.0.1:8081/healthz\n'
+printf '\nStop with: ./scripts/stop-local.sh\n'

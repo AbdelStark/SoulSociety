@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "protocol": "soul-society/1",
+  "programs": {
+    "soul-cairo-v1": {
+      "program_hash": "0x06191fb2725c3a1ebe4843f3200d4556b0041286ad4e13678b99588bae8b13ed",
+      "artifact_sha256": "91a80057cfa0196797658ef7c58ca1647392cd93d936d7427d9aa8bae60be256",
+      "artifact": "crates/soul-cairo/target/dev/soul_cairo.executable.json",
+      "cairo": "2.15.0",
+      "scarb": "2.15.1",
+      "stwo_cairo": "1.3.0",
+      "proof_format": "stwo-cairo-json-v1",
+      "channel": "blake2s"
+    }
+  }
+}

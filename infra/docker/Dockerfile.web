@@ -1,43 +1,45 @@
-# Soul Society Web Frontend Dockerfile
-# Multi-stage build for production
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
-# Build stage
-FROM node:20-alpine AS builder
+FROM rust:1.94.0-bookworm@sha256:365468470075493dc4583f47387001854321c5a8583ea9604b297e67f01c5a4f AS wasm-builder
 
-WORKDIR /app
+RUN cargo install wasm-pack --version 0.15.0 --locked
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /build
+COPY rust-toolchain.toml Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY apps/provider ./apps/provider
+RUN wasm-pack build --target web --release --out-dir /wasm --out-name soul_wasm crates/soul-wasm --locked
+COPY protocol/programs.json /wasm/programs.json
 
-# Copy workspace files
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+FROM node:24.18.0-alpine3.24@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS web-builder
+
+ARG VITE_SOUL_RELAYS=ws://127.0.0.1:7000
+ARG VITE_SOUL_PROVIDER_PUBKEYS
+ENV VITE_SOUL_RELAYS=${VITE_SOUL_RELAYS}
+ENV VITE_SOUL_PROVIDER_PUBKEYS=${VITE_SOUL_PROVIDER_PUBKEYS}
+
+WORKDIR /build
+RUN corepack install --global pnpm@11.17.0
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
+COPY packages/soul-sdk/package.json packages/soul-sdk/
 COPY apps/web/package.json apps/web/
-COPY packages/ packages/
-
-# Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy source
-COPY apps/web/ apps/web/
-COPY packages/ packages/
+COPY packages/soul-sdk packages/soul-sdk
+COPY apps/web apps/web
+COPY --from=wasm-builder /wasm apps/web/public/wasm
 
-# Build
-WORKDIR /app/apps/web
-RUN pnpm build
+RUN pnpm --filter @soul-society/sdk build \
+    && pnpm --filter @soul-society/web build
 
-# Runtime stage
-FROM nginx:alpine
+FROM nginx:1.29.8-alpine3.23@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de AS runtime
 
-# Copy built assets
-COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
-
-# Copy nginx config
+COPY --from=web-builder /build/apps/web/dist /usr/share/nginx/html
 COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Health check
+EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
-
-EXPOSE 80
+  CMD ["wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
 
 CMD ["nginx", "-g", "daemon off;"]

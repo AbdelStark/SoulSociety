@@ -1,372 +1,250 @@
-```
-███████╗ ██████╗ ██╗   ██╗██╗         ███████╗ ██████╗  ██████╗██╗███████╗████████╗██╗   ██╗
-██╔════╝██╔═══██╗██║   ██║██║         ██╔════╝██╔═══██╗██╔════╝██║██╔════╝╚══██╔══╝╚██╗ ██╔╝
-███████╗██║   ██║██║   ██║██║         ███████╗██║   ██║██║     ██║█████╗     ██║    ╚████╔╝
-╚════██║██║   ██║██║   ██║██║         ╚════██║██║   ██║██║     ██║██╔══╝     ██║     ╚██╔╝
-███████║╚██████╔╝╚██████╔╝███████╗    ███████║╚██████╔╝╚██████╗██║███████╗   ██║      ██║
-╚══════╝ ╚═════╝  ╚═════╝ ╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝╚═╝╚══════╝   ╚═╝      ╚═╝
-```
+<div align="center">
 
-<p align="center">
-  <strong>Permissionless. Verifiable. Unstoppable.</strong>
-</p>
+# Soul Society
 
-<p align="center">
-  <em>"Don't trust. Verify." — The cypherpunks were right all along.</em>
-</p>
+### Computation should arrive with a proof the user can verify.
 
-<p align="center">
-  <a href="#quickstart">Quickstart</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#services">Services</a> •
-  <a href="#sdk">SDK</a> •
-  <a href="#contributing">Contributing</a>
-</p>
+[![license: MIT](https://img.shields.io/badge/license-MIT-1d1b18.svg)](LICENSE)
+[![status: research alpha](https://img.shields.io/badge/status-research_alpha-e85232.svg)](#research-alpha)
+
+[Quickstart](#quickstart) · [Architecture](docs/architecture.md) ·
+[Soul Wire](docs/protocol.md) · [Security](docs/security-model.md) ·
+[Contributing](CONTRIBUTING.md)
+
+</div>
 
 ---
 
-## The Problem
+Nostr removes gatekeepers from publishing. Cairo and STWO replace trust in a
+worker with a reviewed program and local verification.
 
-The digital economy runs on trust. Trust in APIs. Trust in oracles. Trust in the magic black boxes that tell us "the answer is 42."
+Soul Society connects those ideas. A client signs a computation request and
+publishes it to Nostr. A provider executes one reviewed and pinned Cairo program, produces a
+STWO proof, and publishes a signed result that points to the proof by hash. The
+client fetches that artifact and verifies the program identity, public
+statement, and proof locally in WebAssembly.
 
-But trust is a single point of failure. Trust is what gets exploited. Trust is what the cypherpunks warned us about.
+The relay is a coordination plane. The provider is an untrusted worker. Neither
+gets to decide what is true.
 
-**What if computation itself could be verified?**
+This is the practical thesis behind
+[verifiable computation for Nostr DVMs](https://hackmd.io/@AbdelStark/nostr-dvm-verifiable-computation):
+permissionless services need client-verifiable results. It also follows the
+[Freedom Tech](https://www.fgu.tech/) premise that useful AI infrastructure
+should be open, user-controlled, privacy-conscious, and difficult to capture.
+Sovereignty here is concrete: the acceptance decision lives with the client.
 
-## The Solution
+## What is real
 
-Soul Society is a **permissionless marketplace** for verifiable digital services. Every computation generates a cryptographic proof—a mathematical guarantee that the work was done correctly.
+The repository implements the complete proof path:
 
-No trust required. Math doesn't lie.
-
+```text
+signed Soul Wire request
+          │
+          ▼
+      Nostr relay ─────────────── untrusted transport
+          │
+          ▼
+   Rust provider intake
+          │
+          ▼
+ canonical Cairo executable ──── the computation authority
+          │
+          ▼
+ STWO proof + native verification
+          │
+          ├── proof JSON ─────── immutable SHA-256 artifact
+          │
+          └── signed result ──── statement + artifact descriptor
+                                      │
+                                      ▼
+                           browser fetch + hash check
+                                      │
+                                      ▼
+                           local STWO WASM verifier
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                                                                         │
-│    You                    Nostr Network                   Provider      │
-│     │                          │                             │          │
-│     │  ──── Job Request ─────► │ ──────────────────────────► │          │
-│     │       (NIP-90 DVM)       │                             │          │
-│     │                          │                             ▼          │
-│     │                          │                      ┌─────────────┐   │
-│     │                          │                      │  Execute    │   │
-│     │                          │                      │  Cairo      │   │
-│     │                          │                      │  Program    │   │
-│     │                          │                      └──────┬──────┘   │
-│     │                          │                             │          │
-│     │                          │                      ┌──────▼──────┐   │
-│     │                          │                      │  Generate   │   │
-│     │                          │                      │  STARK      │   │
-│     │                          │                      │  Proof      │   │
-│     │                          │                      └──────┬──────┘   │
-│     │                          │                             │          │
-│     │  ◄─── Result + Proof ─── │ ◄───────────────────────────┘          │
-│     │                          │                                        │
-│     ▼                          │                                        │
-│  ┌─────────────────┐           │                                        │
-│  │ Verify in       │           │                                        │
-│  │ Browser (WASM)  │           │                                        │
-│  │ No server!      │           │                                        │
-│  └─────────────────┘           │                                        │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
 
-## Why This Matters
+- The Cairo VM, not a duplicate Rust implementation, computes each result.
+- STWO proves the Cairo execution with the Blake2s channel.
+- The provider verifies its own proof before publishing a success event.
+- Nostr carries a bounded descriptor instead of a relay-hostile proof blob.
+- The SDK authenticates events and binds each result to its signed request.
+- The client accepts results only from explicitly configured provider public
+  keys; relay discovery cannot create that trust root.
+- The browser checks artifact size and SHA-256, then verifies the proof against
+  an independently trusted program hash and the exact public statement.
+- Native and WASM verifiers require the exact reviewed FRI, proof-of-work, and
+  canonical preprocessing profile before accepting a proof.
+- Tampered proof bytes, program identity, public input, and public output are
+  negative test cases.
 
-- **No gatekeepers**: Anyone can be a provider. Anyone can be a customer.
-- **No servers**: Verification happens in your browser via WASM.
-- **No trust**: STARK proofs are succinct—tiny proofs for massive computations.
-- **No censorship**: Nostr is the transport layer. Good luck stopping it.
+## Research alpha
+
+Soul Society is a reference implementation, not an audited production network.
+The repository makes no claim that a relay delivered an event, that a provider
+stayed available, that a physical-world action occurred, or that an arbitrary
+Cairo program is safe. A successful verification establishes a narrower fact:
+the pinned Cairo program produced the declared public output from the declared
+public input under the implemented STWO verifier and its cryptographic
+assumptions.
+
+There are no payments, escrow, provider reputation, proof aggregation, or
+encrypted requests yet. Hash preimages and Merkle paths are omitted from the
+declared public statement, but this research alpha makes no zero-knowledge or
+witness-hiding claim; the current Soul Wire request also transports them in
+cleartext. Use test data only.
+
+Read the complete [security model](docs/security-model.md) before building on
+this work.
 
 ## Quickstart
 
-### Prerequisites
+### Run the full stack with Docker
 
-- [Rust](https://rustup.rs/) (stable)
-- [Scarb](https://docs.swmansion.com/scarb/) (2.8.2+) for Cairo
-- [Node.js](https://nodejs.org/) (20+) with pnpm
-- [wasm-pack](https://rustwasm.github.io/wasm-pack/)
-
-### One-liner
+Use Docker Engine or Docker Desktop with Compose v2, plus Bash. The first build
+compiles Cairo, STWO, Rust, and the WASM verifier, so it is intentionally not
+instant. A NIP-07 browser signer is required only to submit through the web UI.
 
 ```bash
-git clone https://github.com/anthropics/soul-society.git && cd soul-society && ./scripts/setup.sh
+# From the repository root:
+./scripts/run-local.sh
 ```
 
-### Manual Setup
+The script starts a pinned local relay, provider, proof artifact endpoint, and
+web client, then waits for every health check:
+
+- web: `http://127.0.0.1:5173`
+- relay: `ws://127.0.0.1:8080`
+- provider: `http://127.0.0.1:8081/healthz`
+
+Stop it with:
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Build everything
-pnpm build
-
-# Run Cairo tests
-cd crates/soul-cairo && scarb test
-
-# Run Rust tests
-cargo test --workspace
-
-# Start the web app
-pnpm -F @soul-society/web dev
+./scripts/stop-local.sh
 ```
 
-## Architecture
+### Build and verify from source
 
-```
-soul-society/
-├── apps/
-│   ├── provider/          # Rust DVM provider service
-│   │   └── src/
-│   │       ├── nostr/     # Nostr event handling
-│   │       └── services/  # Job execution services
-│   └── web/               # React frontend
-│       └── src/
-│           ├── lib/nostr/ # Nostr client integration
-│           └── stores/    # Zustand state management
-├── crates/
-│   ├── soul-core/         # Core types and constants
-│   ├── soul-prover/       # STWO STARK prover/verifier
-│   ├── soul-cairo/        # Cairo programs (provable computation)
-│   └── soul-wasm/         # WASM bindings for browser verification
-└── packages/
-    └── sdk/               # TypeScript SDK
+Pinned host tools are declared in `rust-toolchain.toml`, `.tool-versions`,
+`.node-version`, `package.json`, and the three committed lockfiles.
+
+```bash
+./scripts/setup.sh
+./scripts/check.sh
 ```
 
-### The Stack
-
-| Layer | Technology | Why |
-|-------|------------|-----|
-| **Transport** | [Nostr](https://nostr.com/) | Censorship-resistant, decentralized messaging |
-| **Job Protocol** | [NIP-90](https://github.com/nostr-protocol/nips/blob/master/90.md) | Data Vending Machines—marketplace semantics |
-| **Provable Compute** | [Cairo](https://www.cairo-lang.org/) | Write once, prove anywhere |
-| **Proof System** | [STWO](https://github.com/starkware-libs/stwo) | Circle STARKs—fast, small, post-quantum |
-| **Browser Verify** | WASM | Trustless verification without servers |
+The full check generates deterministic disposable Nostr events and a real
+self-verified Fibonacci STWO proof before native, WASM, SDK, web, and packaging
+gates. `./scripts/generate-test-data.sh` is available separately when reviewing
+fixtures or updating the trusted program manifest. All embedded keys are public
+test vectors.
 
 ## Services
 
-### Fibonacci (kind: 5601/6601)
+All field elements use canonical lowercase `0x` plus 64 hexadecimal nibbles.
 
-Compute the n-th Fibonacci number with proof of correctness.
+| Service | Kind | Public proof statement | Private Cairo witness | Bounds |
+|---|---:|---|---|---|
+| Fibonacci | `5601 → 6601` | `n`, `F(n)` | none | `0 ≤ n ≤ 363` |
+| Poseidon hash check | `5602 → 6602` | expected hash, valid/invalid | preimage | one field element |
+| Poseidon Merkle membership | `5603 → 6603` | root, leaf, index, valid/invalid | sibling path | depth `≤ 32`; index must fit depth |
 
-```typescript
-import { SoulClient } from '@soul-society/sdk';
+“Private witness” describes the Cairo ABI, not a zero-knowledge guarantee. This
+implementation has not been analyzed for witness hiding, and the current
+unencrypted Nostr request reveals the witness.
 
-const client = new SoulClient({ relays: ['wss://relay.damus.io'] });
-const result = await client.fibonacci(1000);
+## Soul Wire, not protocol theatre
 
-console.log(result.value);  // F(1000)
-console.log(result.proof);  // STARK proof
-```
+[NIP-90](https://github.com/nostr-protocol/nips/blob/master/90.md) explored a
+generic Data Vending Machine protocol, but it is currently marked draft and
+unrecommended in favor of focused microstandards. Soul Society therefore uses
+[Soul Wire v1](docs/protocol.md): a small application protocol that borrows the
+request/result kind shape without claiming NIP-90 compliance.
 
-### Hash Verification (kind: 5602/6602)
+Soul Wire is intentionally strict:
 
-Prove that a preimage hashes to a known value (Poseidon hash).
+- request JSON is canonical and repeated in an `i` tag of type `text`;
+- event kind, service, content, and tags must agree;
+- signatures, timestamps, expiry, sizes, field encodings, and bids are checked;
+- tag order is canonical and unknown tags are rejected;
+- results include the complete signed request plus `e` and `p` bindings;
+- clients require an application-configured provider-author allowlist;
+- proof descriptors pin format, media type, size, SHA-256, program hash, and
+  commitment channel;
+- stable public errors reveal no internal paths or proving diagnostics.
 
-```typescript
-const result = await client.verifyHash({
-  hash: '0x1234...',
-  preimage: '0xabcd...'
-});
-```
+Cross-language fixtures live in [`protocol/fixtures`](protocol/fixtures).
 
-### Merkle Proof (kind: 5603/6603)
+## Architecture
 
-Prove membership in a Merkle tree.
+The repository favors a few deep modules over duplicated “service” code:
 
-```typescript
-const result = await client.verifyMerkle({
-  root: '0x...',
-  leaf: '0x...',
-  proof: ['0x...', '0x...'],
-  index: 42
-});
-```
+| Module | Responsibility |
+|---|---|
+| `soul-cairo` | one executable dispatching the three canonical computations |
+| `soul-prover` | execute Cairo, adapt the trace, prove, self-verify, and decode the statement |
+| `soul-core` | Soul Wire types, bounds, canonical codecs, and event authentication |
+| `soul-provider` | bounded work intake, deduplication, Nostr transport, and proof storage |
+| `soul-wasm` | verifier-only STWO boundary for untrusted browser input |
+| `@soul-society/sdk` | signer, relay transport, job lifecycle, proof fetch, and verification |
+| `web` | an accessible proof terminal built on the SDK rather than a second client |
 
-## SDK
+The full rationale—including interfaces, seams, trust boundaries, and failure
+locality—is in [the architecture guide](docs/architecture.md).
 
-### Installation
+## Reproducible toolchain
 
-```bash
-pnpm add @soul-society/sdk
-# or
-npm install @soul-society/sdk
-```
+| Tool | Pinned version |
+|---|---:|
+| Rust | `nightly-2026-01-15` (`rustc 1.94.0-nightly`) |
+| Cairo compiler | `2.15.0` |
+| Scarb | `2.15.1` |
+| STWO Cairo | `1.3.0` |
+| STWO | `2.3.0` |
+| wasm-pack | `0.15.0` |
+| Node.js | `24.18.0` LTS |
+| pnpm | `11.17.0` |
 
-### Usage
+Direct dependencies are exact-pinned. `Cargo.lock`, `Scarb.lock`, and
+`pnpm-lock.yaml` are committed. Docker base images and the local relay are
+pinned by digest. CI regenerates a proof, verifies it natively and in WASM,
+checks the Rust/TypeScript wire fixtures, audits shipped dependencies, and
+smoke-tests the container stack.
 
-```typescript
-import { SoulClient, WasmVerifier } from '@soul-society/sdk';
+See [reproducibility.md](docs/reproducibility.md) for the update procedure.
 
-// Initialize
-const client = new SoulClient({
-  relays: ['wss://relay.damus.io', 'wss://nos.lol'],
-  privateKey: process.env.NOSTR_PRIVATE_KEY, // optional
-});
+## Run a provider
 
-// Submit a job
-const job = await client.submitJob({
-  type: 'fibonacci',
-  input: { n: 100 }
-});
-
-// Wait for result
-const result = await job.wait();
-
-// Verify locally (no server!)
-const verifier = new WasmVerifier();
-const isValid = await verifier.verify(result.proof, result.publicInputs);
-
-console.log('Valid:', isValid); // true
-```
-
-## Event Kinds
-
-Soul Society uses custom NIP-90 event kinds:
-
-| Service | Request Kind | Result Kind |
-|---------|--------------|-------------|
-| Fibonacci | `5601` | `6601` |
-| Hash Verify | `5602` | `6602` |
-| Merkle Proof | `5603` | `6603` |
-
-### Request Event Structure
-
-```json
-{
-  "kind": 5601,
-  "content": "{\"n\": 100}",
-  "tags": [
-    ["bid", "1000"],
-    ["t", "fibonacci"]
-  ]
-}
-```
-
-### Result Event Structure
-
-```json
-{
-  "kind": 6601,
-  "content": "{\"status\":\"verified\",\"output\":{...},\"proof\":{...}}",
-  "tags": [
-    ["e", "<request_id>", "", "request"],
-    ["p", "<customer_pubkey>"],
-    ["status", "Verified"]
-  ]
-}
-```
-
-## Running a Provider
+Production mode refuses an ephemeral identity, plaintext relay URLs, missing
+relays or artifact configuration, and missing or malformed program trust
+values. Operators remain responsible for reviewing those values.
 
 ```bash
-cd apps/provider
+export SOUL_PROVIDER_MODE=production
+export SOUL_PROVIDER_RELAYS=wss://relay.example
+export SOUL_PROVIDER_SECRET_KEY=... # exactly 32 secret hex bytes
+export SOUL_PROVIDER_HTTP_ADDR=0.0.0.0:8081
+export SOUL_PROVIDER_ARTIFACT_DIR=/var/lib/soul/proofs
+export SOUL_PROVIDER_PUBLIC_BASE_URL=https://proofs.example
+export SOUL_CAIRO_EXECUTABLE=/opt/soul/soul_cairo.executable.json
+export SOUL_CAIRO_PROGRAM_HASH=...   # from reviewed protocol/programs.json
+export SOUL_CAIRO_EXECUTABLE_SHA256=... # from the same manifest
 
-# Configure
-export NOSTR_PRIVATE_KEY="nsec1..."
-export RELAY_URLS="wss://relay.damus.io,wss://nos.lol"
-
-# Run
-cargo run --release
+cargo run --locked --release --package soul-provider
 ```
 
-The provider will:
-1. Subscribe to DVM request events
-2. Execute Cairo programs
-3. Generate STARK proofs
-4. Publish verified results
-
-## Security Model
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    TRUST ASSUMPTIONS                         │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  What you MUST trust:                                        │
-│  ├── Cryptographic assumptions (collision-resistant hash)    │
-│  ├── Cairo program correctness (auditable, open source)      │
-│  └── Your browser (where WASM runs)                          │
-│                                                              │
-│  What you DON'T trust:                                       │
-│  ├── The provider                                            │
-│  ├── The relay                                               │
-│  ├── The network                                             │
-│  └── Anyone                                                  │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**STARK proofs are information-theoretic**: even with unlimited computational power, a malicious provider cannot forge a valid proof for an incorrect computation.
-
-## Performance
-
-| Metric | Value |
-|--------|-------|
-| Proof size | ~100 KB |
-| Verification time | <100ms (browser) |
-| Proving time | Service-dependent |
-
-## Roadmap
-
-- [x] Core infrastructure
-- [x] Fibonacci service
-- [x] Hash verification service
-- [x] Merkle proof service
-- [x] Browser WASM verification
-- [x] TypeScript SDK
-- [ ] Lightning payments integration
-- [ ] More Cairo programs (signatures, range proofs)
-- [ ] Provider reputation system
-- [ ] Multi-provider redundancy
-
-## Philosophy
-
-> "Privacy is necessary for an open society in the electronic age."
-> — Eric Hughes, A Cypherpunk's Manifesto (1993)
-
-Soul Society extends this vision: **verifiability is necessary for a trustless society in the computational age.**
-
-We don't ask you to trust us. We give you the tools to verify everything yourself.
-
-The math is open. The code is open. The network is open.
-
-**Verify, don't trust.**
+Operational details are in [deployment.md](docs/deployment.md).
 
 ## Contributing
 
-We welcome contributions from fellow travelers on the path to a more verifiable future.
+The highest-leverage contributions strengthen a trust boundary: a new negative
+proof test, a cross-language fixture, a protocol ambiguity removed, or a
+reproducible toolchain improvement.
 
-```bash
-# Fork, clone, branch
-git checkout -b feature/your-feature
-
-# Make changes, test
-cargo test --workspace
-pnpm test
-
-# Submit PR
-```
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and
+[adding-a-service.md](docs/adding-a-service.md). Follow [SECURITY.md](SECURITY.md)
+for private vulnerability reporting; do not open a public issue.
 
 ## License
 
-MIT — Do what you want. Change the world.
-
----
-
-<p align="center">
-  <em>"The computer can be used as a tool to liberate and protect people, rather than to control them."</em>
-  <br>
-  — Hal Finney
-</p>
-
-<p align="center">
-  Built with cryptographic conviction by humans who believe in a verifiable future.
-</p>
-
-<p align="center">
-  <sub>⚡ Powered by STARKs • Delivered by Nostr • Verified by Math ⚡</sub>
-</p>
+[MIT](LICENSE). Fork it, audit it, run it, and make the verifier harder to fool.

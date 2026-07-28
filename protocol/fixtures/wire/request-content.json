@@ -1,0 +1,9 @@
+{
+  "protocol": "soul-society/1",
+  "service": "fibonacci",
+  "input": {
+    "type": "fibonacci",
+    "n": 10
+  },
+  "expires_at": 1900000600
+}

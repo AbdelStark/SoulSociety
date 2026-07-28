@@ -1,5 +1,5 @@
-//! Nostr client and event handling for Soul Provider
+//! Nostr client and Soul Wire event handling.
 
-pub mod handler;
+mod handler;
 
 pub use handler::*;

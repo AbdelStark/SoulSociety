@@ -2,20 +2,22 @@
 name = "soul_cairo"
 version = "0.1.0"
 edition = "2024_07"
+cairo-version = "=2.15.0"
 description = "Cairo programs for Soul Society verifiable computations"
 authors = ["Abdel <abdel@starkware.co>"]
 license = "MIT"
 repository = "https://github.com/AbdelStark/SoulSociety"
 
+[cairo]
+enable-gas = false
+
 [dependencies]
-starknet = ">=2.8.2"
+cairo_execute = "=2.15.0"
 
 [dev-dependencies]
-cairo_test = ">=2.8.2"
+cairo_test = "=2.15.0"
 
 [scripts]
 test = "scarb cairo-test"
 
-[[target.starknet-contract]]
-sierra = true
-casm = true
+[[target.executable]]

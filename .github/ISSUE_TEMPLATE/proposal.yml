@@ -1,0 +1,40 @@
+name: Design proposal
+description: Propose a service, protocol, proof, architecture, or public API change.
+title: "proposal: "
+labels: ["proposal"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or trust-boundary problem needs solving?
+    validations:
+      required: true
+  - type: textarea
+    id: claim
+    attributes:
+      label: Verifiable claim
+      description: What exact fact should a successful proof establish, and what should remain unclaimed?
+    validations:
+      required: true
+  - type: textarea
+    id: statement
+    attributes:
+      label: Public statement and private witness
+      description: List the public input/output, private witness, encodings, and bounds.
+    validations:
+      required: true
+  - type: textarea
+    id: design
+    attributes:
+      label: Proposed design
+      description: Identify the owning module, interfaces, wire changes, compatibility, and alternatives.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Required evidence
+      description: Positive, negative, cross-language, mutation, and end-to-end tests.
+    validations:
+      required: true
