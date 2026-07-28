@@ -58,6 +58,7 @@ require scarb
 [[ "$(scarb --version | awk 'NR == 1 {print $2}')" == "${SCARB_VERSION}" ]] \
   || fail "Scarb ${SCARB_VERSION} is required"
 
+corepack enable
 corepack install --global "pnpm@${PNPM_VERSION}"
 if command -v asdf >/dev/null 2>&1; then
   asdf reshim nodejs "${NODE_VERSION}"

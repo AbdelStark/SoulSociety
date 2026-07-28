@@ -19,7 +19,9 @@ ENV VITE_SOUL_RELAYS=${VITE_SOUL_RELAYS}
 ENV VITE_SOUL_PROVIDER_PUBKEYS=${VITE_SOUL_PROVIDER_PUBKEYS}
 
 WORKDIR /build
-RUN corepack install --global pnpm@11.17.0
+RUN corepack enable \
+    && corepack install --global pnpm@11.17.0 \
+    && test "$(pnpm --version)" = "11.17.0"
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
 COPY packages/soul-sdk/package.json packages/soul-sdk/
