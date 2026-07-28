@@ -57,8 +57,12 @@ jobs:
         run: |
           corepack enable
           corepack install --global pnpm@11.17.0
-          cargo install wasm-pack --version 0.15.0 --locked
-          cargo install cargo-audit --version 0.22.2 --locked
+          if [[ "$(wasm-pack --version 2>/dev/null | awk '{print $NF}')" != "0.15.0" ]]; then
+            cargo install wasm-pack --version 0.15.0 --locked --force
+          fi
+          if [[ "$(cargo audit --version 2>/dev/null | awk '{print $NF}')" != "0.22.2" ]]; then
+            cargo install cargo-audit --version 0.22.2 --locked --force
+          fi
 
       - name: Verify toolchain contract
         run: |
@@ -66,6 +70,7 @@ jobs:
           test "$(pnpm --version)" = "11.17.0"
           test "$(scarb --version | awk 'NR == 1 {print $2}')" = "2.15.1"
           test "$(wasm-pack --version | awk '{print $2}')" = "0.15.0"
+          test "$(cargo audit --version | awk '{print $NF}')" = "0.22.2"
           rustc --version
 
       - name: Install JavaScript dependencies
