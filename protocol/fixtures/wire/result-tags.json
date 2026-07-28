@@ -1,0 +1,35 @@
+[
+  [
+    "request",
+    "{\"id\":\"cd1b282369640261c031ef99f25e27231b6fcfa8be901b042f80144046a3fbd8\",\"pubkey\":\"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"created_at\":1900000000,\"kind\":5601,\"tags\":[[\"i\",\"{\\\"protocol\\\":\\\"soul-society/1\\\",\\\"service\\\":\\\"fibonacci\\\",\\\"input\\\":{\\\"type\\\":\\\"fibonacci\\\",\\\"n\\\":10},\\\"expires_at\\\":1900000600}\",\"text\"],[\"protocol\",\"soul-society/1\"],[\"service\",\"fibonacci\"],[\"t\",\"soul-society\"],[\"expiration\",\"1900000600\"],[\"bid\",\"21\"]],\"content\":\"{\\\"protocol\\\":\\\"soul-society/1\\\",\\\"service\\\":\\\"fibonacci\\\",\\\"input\\\":{\\\"type\\\":\\\"fibonacci\\\",\\\"n\\\":10},\\\"expires_at\\\":1900000600}\",\"sig\":\"5f5bae2f636eef7598bc67d6dc99444dd987a7b7e0a9c777914cf19e0add6ef7c91b67d2f2f9f0b71195d373ab0ca25fa7a6b8c5c4af0b3b93089b08569202a4\"}"
+  ],
+  [
+    "e",
+    "cd1b282369640261c031ef99f25e27231b6fcfa8be901b042f80144046a3fbd8"
+  ],
+  [
+    "p",
+    "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+  ],
+  [
+    "i",
+    "{\"protocol\":\"soul-society/1\",\"service\":\"fibonacci\",\"input\":{\"type\":\"fibonacci\",\"n\":10},\"expires_at\":1900000600}",
+    "text"
+  ],
+  [
+    "status",
+    "success"
+  ],
+  [
+    "protocol",
+    "soul-society/1"
+  ],
+  [
+    "service",
+    "fibonacci"
+  ],
+  [
+    "t",
+    "soul-society"
+  ]
+]

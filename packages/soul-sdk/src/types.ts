@@ -1,185 +1,175 @@
-/**
- * Soul Society Core Types
- *
- * TypeScript equivalents of the Rust types in soul-core.
- */
+import type { Event } from 'nostr-tools';
 
-/**
- * Unique identifier for a job
- */
-export type JobId = string;
+export type FieldElement = `0x${string}`;
+export type Hex64 = string;
 
-/**
- * Service type identifier
- */
-export enum ServiceType {
-  Fibonacci = 'Fibonacci',
-  HashVerify = 'HashVerify',
-  MerkleProof = 'MerkleProof',
-}
+export const ServiceType = {
+  Fibonacci: 'fibonacci',
+  HashVerify: 'hash_verify',
+  MerkleProof: 'merkle_proof',
+} as const;
 
-/**
- * Job status lifecycle
- */
-export enum JobStatus {
-  Pending = 'pending',
-  Processing = 'processing',
-  Proven = 'proven',
-  Verified = 'verified',
-  Failed = 'failed',
-}
+export type ServiceType = (typeof ServiceType)[keyof typeof ServiceType];
 
-/**
- * Base job input type
- */
-export interface JobInputBase {
-  type: ServiceType;
-}
-
-/**
- * Fibonacci computation input
- */
-export interface FibonacciInput extends JobInputBase {
-  type: ServiceType.Fibonacci;
-  /** Which Fibonacci number to compute (0-indexed) */
+export interface FibonacciInput {
+  type: typeof ServiceType.Fibonacci;
   n: number;
 }
 
-/**
- * Hash verification input
- */
-export interface HashVerifyInput extends JobInputBase {
-  type: ServiceType.HashVerify;
-  /** Expected hash (hex encoded) */
-  hash: string;
-  /** Preimage to verify (hex encoded) */
-  preimage: string;
+export interface HashVerifyInput {
+  type: typeof ServiceType.HashVerify;
+  hash: FieldElement;
+  preimage: FieldElement;
 }
 
-/**
- * Merkle proof verification input
- */
-export interface MerkleProofInput extends JobInputBase {
-  type: ServiceType.MerkleProof;
-  /** Merkle root (hex encoded) */
-  root: string;
-  /** Leaf to verify (hex encoded) */
-  leaf: string;
-  /** Sibling hashes for proof path (hex encoded) */
-  proof: string[];
-  /** Leaf index in the tree */
+export interface MerkleProofInput {
+  type: typeof ServiceType.MerkleProof;
+  root: FieldElement;
+  leaf: FieldElement;
+  proof: FieldElement[];
   index: number;
 }
 
-/**
- * Union type for all job inputs
- */
 export type JobInput = FibonacciInput | HashVerifyInput | MerkleProofInput;
 
-/**
- * Job request
- */
-export interface JobRequest {
-  /** Unique job identifier */
-  id: JobId;
-  /** Type of service requested */
-  service: ServiceType;
-  /** Service-specific input */
-  input: JobInput;
-  /** Payment bid in millisatoshis */
-  bidMsats: number;
-  /** Customer's Nostr public key */
-  customerPubkey: string;
-  /** Unix timestamp when the job was created */
-  createdAt: number;
-}
-
-/**
- * Fibonacci computation output
- */
 export interface FibonacciOutput {
-  type: ServiceType.Fibonacci;
-  /** The computed Fibonacci number as a string (for large values) */
-  result: string;
+  type: typeof ServiceType.Fibonacci;
+  result: FieldElement;
 }
 
-/**
- * Hash verification output
- */
 export interface HashVerifyOutput {
-  type: ServiceType.HashVerify;
-  /** Whether the preimage matches the hash */
+  type: typeof ServiceType.HashVerify;
   valid: boolean;
 }
 
-/**
- * Merkle proof verification output
- */
 export interface MerkleProofOutput {
-  type: ServiceType.MerkleProof;
-  /** Whether the leaf is in the tree */
+  type: typeof ServiceType.MerkleProof;
   valid: boolean;
 }
 
-/**
- * Union type for all job outputs
- */
 export type JobOutput = FibonacciOutput | HashVerifyOutput | MerkleProofOutput;
 
-/**
- * STARK proof wrapper
- */
-export interface StarkProof {
-  /** Serialized STWO proof bytes */
+export interface JobRequestContent {
+  protocol: 'soul-society/1';
+  service: ServiceType;
+  input: JobInput;
+  expires_at?: number;
+}
+
+export interface ProofStatement {
+  service: ServiceType;
+  program: 'soul-cairo-v1';
+  public_input: FieldElement[];
+  public_output: FieldElement[];
+  output: JobOutput;
+}
+
+export interface ProofDescriptor {
+  format: 'stwo-cairo-json-v1';
+  media_type: 'application/vnd.soul-society.stwo-proof+json';
+  url: string;
+  sha256: Hex64;
+  byte_size: number;
+  program_hash: FieldElement;
+  channel: 'blake2s';
+}
+
+export interface JobMetrics {
+  execution_ms: number;
+  proving_ms: number;
+  verification_ms: number;
+}
+
+export const ErrorCode = {
+  InvalidRequest: 'invalid_request',
+  UnsupportedService: 'unsupported_service',
+  Expired: 'expired',
+  Duplicate: 'duplicate',
+  Busy: 'busy',
+  ProvingFailed: 'proving_failed',
+  ArtifactUnavailable: 'artifact_unavailable',
+  Internal: 'internal',
+} as const;
+
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+
+export interface JobError {
+  code: ErrorCode;
+  message: string;
+}
+
+export interface SuccessfulJobResult {
+  status: 'success';
+  protocol: 'soul-society/1';
+  request_id: Hex64;
+  statement: ProofStatement;
+  proof: ProofDescriptor;
+  metrics: JobMetrics;
+}
+
+export interface FailedJobResult {
+  status: 'error';
+  protocol: 'soul-society/1';
+  request_id: Hex64;
+  error: JobError;
+}
+
+export type JobResult = SuccessfulJobResult | FailedJobResult;
+
+export interface ValidatedRequest {
+  event: Event;
+  content: JobRequestContent;
+  canonicalContent: string;
+}
+
+export interface ValidatedResult {
+  event: Event;
+  content: JobResult;
+}
+
+export type JobLifecycleState =
+  | 'draft'
+  | 'publishing'
+  | 'awaiting_result'
+  | 'result_received'
+  | 'fetching'
+  | 'verifying'
+  | 'verified'
+  | 'failed';
+
+export type LocalFailureCode =
+  | 'cancelled'
+  | 'publish_failed'
+  | 'result_timeout'
+  | 'invalid_result'
+  | 'proof_fetch_failed'
+  | 'proof_hash_mismatch'
+  | 'untrusted_program'
+  | 'verification_failed'
+  | 'verifier_unavailable';
+
+export interface JobFailure {
+  code: ErrorCode | LocalFailureCode;
+  message: string;
+  retryable: boolean;
+}
+
+export interface VerifiedJob {
+  request: ValidatedRequest;
+  result: ValidatedResult & { content: SuccessfulJobResult };
   proofBytes: Uint8Array;
-  /** Proof commitment (hex encoded) */
-  commitment: string;
-  /** Public inputs used for verification */
-  publicInputs: string[];
 }
 
-/**
- * Job result with proof
- */
-export interface JobResult {
-  /** Unique result identifier */
-  id: JobId;
-  /** Reference to the original request */
-  requestId: JobId;
-  /** Current job status */
-  status: JobStatus;
-  /** Error message if status is Failed */
-  error?: string;
-  /** Service-specific output */
-  output?: JobOutput;
-  /** STARK proof */
-  proof?: StarkProof;
-  /** Execution time in milliseconds */
-  executionTimeMs: number;
+export interface JobSnapshot {
+  state: JobLifecycleState;
+  input: JobInput;
+  request?: ValidatedRequest;
+  result?: ValidatedResult;
+  verified?: VerifiedJob;
+  failure?: JobFailure;
+  publishAttempt: number;
+  proofAttempt: number;
+  updatedAt: number;
 }
 
-/**
- * DVM result event content structure
- */
-export interface DVMResultContent {
-  result: JobOutput;
-  proof: StarkProof;
-}
-
-/**
- * DVM result event from Nostr
- */
-export interface DVMResult {
-  /** Nostr event ID */
-  eventId: string;
-  /** Reference to request event ID */
-  requestId: string;
-  /** Job status */
-  status: 'success' | 'error';
-  /** Job output */
-  result?: JobOutput;
-  /** STARK proof */
-  proof?: StarkProof;
-  /** Error message if status is 'error' */
-  error?: string;
-}
+export type JobListener = (snapshot: Readonly<JobSnapshot>) => void;

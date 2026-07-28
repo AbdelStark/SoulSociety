@@ -1,0 +1,27 @@
+[
+  [
+    "i",
+    "{\"protocol\":\"soul-society/1\",\"service\":\"fibonacci\",\"input\":{\"type\":\"fibonacci\",\"n\":10},\"expires_at\":1900000600}",
+    "text"
+  ],
+  [
+    "protocol",
+    "soul-society/1"
+  ],
+  [
+    "service",
+    "fibonacci"
+  ],
+  [
+    "t",
+    "soul-society"
+  ],
+  [
+    "expiration",
+    "1900000600"
+  ],
+  [
+    "bid",
+    "21"
+  ]
+]

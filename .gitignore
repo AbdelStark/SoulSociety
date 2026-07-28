@@ -15,10 +15,13 @@ dist-ssr/
 # Rust
 /target/
 **/*.rs.bk
-Cargo.lock
 
 # WASM
 crates/soul-wasm/pkg/
+apps/web/public/wasm/
+
+# Generated proof fixtures (regenerated and verified in CI)
+protocol/fixtures/generated/
 
 # Cairo
 crates/soul-cairo/target/

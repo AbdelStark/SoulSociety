@@ -2,8 +2,8 @@
 //!
 //! Verifies that a preimage hashes to an expected hash value using Poseidon.
 
-use core::poseidon::poseidon_hash_span;
 use core::array::ArrayTrait;
+use core::poseidon::poseidon_hash_span;
 
 /// Verify that a preimage hashes to the expected hash
 ///
@@ -38,7 +38,7 @@ pub fn compute_hash(value: felt252) -> felt252 {
 
 #[cfg(test)]
 mod tests {
-    use super::{verify_hash, compute_hash};
+    use super::{compute_hash, verify_hash};
 
     #[test]
     fn test_hash_verification() {

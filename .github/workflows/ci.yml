@@ -1,134 +1,170 @@
-name: CI
+name: verification
 
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verification-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
 
 jobs:
-  rust-test:
-    name: Rust Tests
-    runs-on: ubuntu-latest
+  proof-and-clients:
+    name: proof, protocol, WASM, and clients
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+      CARGO_PROFILE_RELEASE_LTO: thin
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Node 24.18.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          components: rustfmt, clippy
+          node-version: 24.18.0
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - name: Install Scarb 2.15.1
+        uses: software-mansion/setup-scarb@2a96b748888e3329ee44ac9ac073d930e692b3cd # v1
+        with:
+          scarb-version: 2.15.1
+          scarb-lock: crates/soul-cairo/Scarb.lock
+
+      - name: Cache Rust and pnpm artifacts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+            ~/.cargo/bin
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            ~/.local/share/pnpm/store
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-soul-v1-${{ hashFiles('Cargo.lock', 'pnpm-lock.yaml', 'rust-toolchain.toml') }}
+
+      - name: Activate pinned package tools
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.17.0
+          if [[ "$(wasm-pack --version 2>/dev/null | awk '{print $NF}')" != "0.15.0" ]]; then
+            cargo install wasm-pack --version 0.15.0 --locked --force
+          fi
+          if [[ "$(cargo audit --version 2>/dev/null | awk '{print $NF}')" != "0.22.2" ]]; then
+            cargo install cargo-audit --version 0.22.2 --locked --force
+          fi
+
+      - name: Verify toolchain contract
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(pnpm --version)" = "11.17.0"
+          test "$(scarb --version | awk 'NR == 1 {print $2}')" = "2.15.1"
+          test "$(wasm-pack --version | awk '{print $2}')" = "0.15.0"
+          test "$(cargo audit --version | awk '{print $NF}')" = "0.22.2"
+          rustc --version
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Build
-        run: cargo build --workspace --all-targets
-
-      - name: Run tests
-        run: cargo test --workspace
-
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-  cairo-test:
-    name: Cairo Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Scarb
-        uses: software-mansion/setup-scarb@v1
-        with:
-          scarb-version: "2.8.2"
-
-      - name: Build Cairo
-        working-directory: crates/soul-cairo
-        run: scarb build
-
-      - name: Run Cairo tests
-        working-directory: crates/soul-cairo
-        run: scarb test
-
-  web-build:
-    name: Web Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Get pnpm store directory
-        shell: bash
         run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+          cargo fmt --all -- --check
+          (cd crates/soul-cairo && scarb fmt --check)
 
-      - name: Cache pnpm
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+      - name: Build and test Cairo
+        run: |
+          cd crates/soul-cairo
+          scarb build
+          scarb cairo-test
+          git diff --exit-code -- Scarb.lock
 
-      - name: Install dependencies
-        run: pnpm install
+      - name: Lint and test Rust
+        run: |
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo test --workspace --all-targets --locked
 
-      - name: Build SDK
-        run: pnpm -F @soul-society/sdk build
+      - name: Generate and self-verify a real STWO proof
+        run: |
+          ./scripts/generate-test-data.sh
+          git diff --exit-code -- protocol/fixtures/wire protocol/programs.json
+          cargo test --locked --package soul-prover --features real-proof-fixture
+          cargo test --locked --package soul-wasm --features real-proof-fixture
+          SOUL_TEST_CAIRO_EXECUTABLE="$PWD/crates/soul-cairo/target/dev/soul_cairo.executable.json" \
+          SOUL_TEST_CAIRO_PROGRAM_HASH="$(awk -F '"' '/"program_hash"/ {print $4; exit}' protocol/programs.json)" \
+          SOUL_TEST_CAIRO_EXECUTABLE_SHA256="$(awk -F '"' '/"artifact_sha256"/ {print $4; exit}' protocol/programs.json)" \
+          cargo test --locked --package soul-provider --test signed_real_pipeline -- --ignored --nocapture
 
-      - name: Build web app
-        run: pnpm -F @soul-society/web build
+      - name: Exercise the real local-relay round trip
+        run: ./scripts/e2e-local-relay.sh
 
-  wasm-build:
-    name: WASM Build
-    runs-on: ubuntu-latest
+      - name: Build and test the browser verifier
+        run: |
+          ./scripts/build-wasm.sh
+          wasm-pack test --node crates/soul-wasm --locked --features real-proof-fixture
+
+      - name: Lint, test, and build TypeScript
+        run: |
+          pnpm lint
+          pnpm test
+          pnpm build
+
+      - name: Verify SDK package contents
+        run: |
+          mkdir -p /tmp/soul-pack
+          pnpm --filter @soul-society/sdk pack --pack-destination /tmp/soul-pack
+          test -n "$(find /tmp/soul-pack -maxdepth 1 -name '*.tgz' -print -quit)"
+
+      - name: Audit shipped dependencies
+        run: |
+          cargo audit
+          pnpm audit --prod --audit-level high
+
+  container-smoke:
+    name: reproducible local stack
+    needs: proof-and-clients
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      SOUL_PROVIDER_MODE: development
+      SOUL_PROVIDER_SECRET_KEY: "0000000000000000000000000000000000000000000000000000000000000002"
+      VITE_SOUL_PROVIDER_PUBKEYS: c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
+      - name: Resolve tracked trust roots
+        run: |
+          echo "SOUL_CAIRO_PROGRAM_HASH=$(awk -F '\"' '/\"program_hash\"/ {print $4; exit}' protocol/programs.json)" >> "$GITHUB_ENV"
+          echo "SOUL_CAIRO_EXECUTABLE_SHA256=$(awk -F '\"' '/\"artifact_sha256\"/ {print $4; exit}' protocol/programs.json)" >> "$GITHUB_ENV"
 
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-wasm-
+      - name: Start pinned containers
+        run: |
+          docker compose --file infra/docker-compose.yml config --quiet
+          docker compose --file infra/docker-compose.yml up --build --detach --wait --wait-timeout 300
+          curl --fail --silent --header 'Accept: application/nostr+json' http://127.0.0.1:8080 >/dev/null
+          curl --fail --silent http://127.0.0.1:8081/healthz >/dev/null
+          curl --fail --silent http://127.0.0.1:5173/healthz >/dev/null
+          docker compose --file infra/docker-compose.yml exec --no-TTY provider \
+            env SOUL_E2E_RELAY=ws://relay:8080 \
+                SOUL_E2E_PROVIDER_PUBKEY="$VITE_SOUL_PROVIDER_PUBKEYS" \
+                SOUL_E2E_TIMEOUT_SECS=240 \
+            /app/soul-local-client
 
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Show service logs after failure
+        if: failure()
+        run: docker compose --file infra/docker-compose.yml logs --no-color
 
-      - name: Build WASM
-        run: wasm-pack build crates/soul-wasm --target web
+      - name: Stop the stack
+        if: always()
+        run: docker compose --file infra/docker-compose.yml down --volumes

@@ -29,7 +29,7 @@ pub fn compute_fibonacci(n: u64) -> felt252 {
         b = a + b;
         a = temp;
         i += 1;
-    };
+    }
 
     b
 }

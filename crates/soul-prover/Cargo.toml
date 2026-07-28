@@ -3,27 +3,35 @@ name = "soul-prover"
 description = "STWO prover integration for Soul Society"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-# Core types
-soul-core = { path = "../soul-core" }
-
-# Serialization
+soul-core = { path = "../soul-core", default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
-
-# Error handling
 thiserror = { workspace = true }
-anyhow = { workspace = true }
-
-# Crypto
 hex = { workspace = true }
+sha2 = { workspace = true }
 
-# TODO: Add STWO prover dependency when implementing
-# stwo-prover = { git = "https://github.com/starkware-libs/stwo" }
+# Cairo executable runner. These exact versions match the executable emitted
+# by Scarb/Cairo 2.15.0.
+cairo-lang-executable = "=2.15.0"
+cairo-lang-runner = "=2.15.0"
+cairo-vm = { version = "=3.2.0", default-features = false, features = [
+    "extensive_hints",
+    "mod_builtin",
+] }
 
-[dev-dependencies]
-tokio-test = { workspace = true }
+# STWO Cairo v1.3.0. The prover and verifier must stay on one release family.
+cairo-air = { workspace = true }
+starknet-ff = { workspace = true }
+stwo = { workspace = true, features = ["parallel", "prover"] }
+stwo-cairo-adapter = "=1.3.0"
+stwo-cairo-common = { workspace = true }
+stwo-cairo-prover = "=1.3.0"
+
+[features]
+real-proof-fixture = []

@@ -1,8 +1,9 @@
 [package]
 name = "soul-provider"
-description = "DVM Service Provider for Soul Society"
+description = "Soul Wire provider for Cairo execution and STWO proof publication"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
@@ -16,11 +17,9 @@ path = "src/main.rs"
 soul-core = { path = "../../crates/soul-core" }
 soul-prover = { path = "../../crates/soul-prover" }
 
-# UUID for result IDs
-uuid = { version = "1.0", features = ["v4"] }
-
 # Async runtime
 tokio = { workspace = true }
+async-trait = "=0.1.91"
 
 # Serialization
 serde = { workspace = true }
@@ -38,5 +37,14 @@ tracing-subscriber = { workspace = true }
 nostr-sdk = { workspace = true }
 nostr = { workspace = true }
 
+# Proof artifact service
+axum = "=0.8.9"
+bytes = "=1.12.1"
+sha2 = { workspace = true }
+tower-http = { version = "=0.7.0", features = ["cors"] }
+url = { workspace = true }
+
 [dev-dependencies]
 tokio-test = { workspace = true }
+tempfile = "=3.23.0"
+tower = { version = "=0.5.3", features = ["util"] }

@@ -1,0 +1,33 @@
+{
+  "status": "success",
+  "protocol": "soul-society/1",
+  "request_id": "cd1b282369640261c031ef99f25e27231b6fcfa8be901b042f80144046a3fbd8",
+  "statement": {
+    "service": "fibonacci",
+    "program": "soul-cairo-v1",
+    "public_input": [
+      "0x000000000000000000000000000000000000000000000000000000000000000a"
+    ],
+    "public_output": [
+      "0x0000000000000000000000000000000000000000000000000000000000000037"
+    ],
+    "output": {
+      "type": "fibonacci",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000037"
+    }
+  },
+  "proof": {
+    "format": "stwo-cairo-json-v1",
+    "media_type": "application/vnd.soul-society.stwo-proof+json",
+    "url": "https://proofs.example/v1/proofs/5d23ce867fb5c3e2f3346e090e5a7dd4f1d5e088735b9b968f0812c4f350504e.json",
+    "sha256": "5d23ce867fb5c3e2f3346e090e5a7dd4f1d5e088735b9b968f0812c4f350504e",
+    "byte_size": 29,
+    "program_hash": "0x0000000000000000000000000000000000000000000000000000000000000009",
+    "channel": "blake2s"
+  },
+  "metrics": {
+    "execution_ms": 1,
+    "proving_ms": 2,
+    "verification_ms": 3
+  }
+}

@@ -1,88 +1,45 @@
-#!/bin/bash
-# Build WASM bindings for browser verification
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
-# Colors
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+readonly WASM_PACK_VERSION="0.15.0"
+readonly OUTPUT_DIR="${REPO_ROOT}/apps/web/public/wasm"
+readonly PROGRAM_MANIFEST="${REPO_ROOT}/protocol/programs.json"
 
-echo -e "${GREEN}🔧 Building Soul Society WASM Bindings${NC}"
-echo ""
-
-# Navigate to project root
-cd "$(dirname "$0")/.."
-
-# Check for wasm-pack
-if ! command -v wasm-pack &> /dev/null; then
-    echo -e "${YELLOW}Installing wasm-pack...${NC}"
-    cargo install wasm-pack
-fi
-
-# Build WASM
-echo -e "${YELLOW}Building WASM package...${NC}"
-cd crates/soul-wasm
-wasm-pack build --target web --out-dir pkg
-
-# Create destination directory
-DEST_DIR="../../apps/web/src/lib/verification/wasm"
-mkdir -p "$DEST_DIR"
-
-# Copy WASM files
-echo -e "${YELLOW}Copying to web app...${NC}"
-cp pkg/soul_wasm.js "$DEST_DIR/"
-cp pkg/soul_wasm_bg.wasm "$DEST_DIR/"
-cp pkg/soul_wasm.d.ts "$DEST_DIR/" 2>/dev/null || true
-
-# Create TypeScript wrapper if it doesn't exist
-if [ ! -f "$DEST_DIR/index.ts" ]; then
-    cat > "$DEST_DIR/index.ts" << 'EOF'
-// Soul Society WASM Verification Module
-// Auto-generated wrapper for soul-wasm bindings
-
-import init, { WasmVerifier, init_panic_hook } from './soul_wasm.js';
-
-let initialized = false;
-let verifier: WasmVerifier | null = null;
-
-/**
- * Initialize the WASM module
- * Must be called before using any verification functions
- */
-export async function initWasm(): Promise<void> {
-  if (initialized) return;
-
-  await init();
-  init_panic_hook();
-  verifier = new WasmVerifier();
-  initialized = true;
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
 }
 
-/**
- * Verify a STARK proof
- *
- * @param proofBytes - The serialized proof bytes
- * @param publicInputs - Array of public inputs as strings
- * @returns Promise<boolean> - true if the proof is valid
- */
-export async function verifyProof(
-  proofBytes: Uint8Array,
-  publicInputs: string[]
-): Promise<boolean> {
-  if (!initialized || !verifier) {
-    await initWasm();
-  }
+command -v wasm-pack >/dev/null 2>&1 \
+  || fail "wasm-pack ${WASM_PACK_VERSION} is required; run ./scripts/setup.sh"
 
-  return verifier!.verify_proof(proofBytes, JSON.stringify(publicInputs));
-}
+actual_version="$(wasm-pack --version | awk '{print $2}')"
+[[ "${actual_version}" == "${WASM_PACK_VERSION}" ]] \
+  || fail "wasm-pack ${WASM_PACK_VERSION} is required (found ${actual_version})"
+[[ -f "${PROGRAM_MANIFEST}" ]] \
+  || fail "trusted program manifest is missing; run ./scripts/generate-test-data.sh"
 
-export { WasmVerifier };
-EOF
-    echo -e "${GREEN}✅ Created TypeScript wrapper${NC}"
-fi
+temporary_dir="$(mktemp -d "${TMPDIR:-/tmp}/soul-wasm.XXXXXX")"
+trap 'rm -rf -- "${temporary_dir}"' EXIT
 
-cd ../..
-echo ""
-echo -e "${GREEN}✅ WASM bindings built and copied to web app${NC}"
-echo "   Location: apps/web/src/lib/verification/wasm/"
+env \
+  -u AR_wasm32_unknown_unknown \
+  -u CC_wasm32_unknown_unknown \
+  -u CFLAGS_wasm32_unknown_unknown \
+  -u CXX_wasm32_unknown_unknown \
+  wasm-pack build \
+  --release \
+  --target web \
+  --out-dir "${temporary_dir}/wasm" \
+  --out-name soul_wasm \
+  "${REPO_ROOT}/crates/soul-wasm" \
+  --locked
+
+rm -rf -- "${OUTPUT_DIR}"
+mkdir -p -- "${OUTPUT_DIR}"
+cp -R -- "${temporary_dir}/wasm/." "${OUTPUT_DIR}/"
+cp -- "${PROGRAM_MANIFEST}" "${OUTPUT_DIR}/programs.json"
+
+printf 'WASM verifier built at %s\n' "${OUTPUT_DIR}"

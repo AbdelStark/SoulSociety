@@ -1,44 +1,84 @@
-# Soul Provider Dockerfile
-# Multi-stage build for production
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
-# Build stage
-FROM rust:1.75-bookworm AS builder
+FROM rust:1.94.0-bookworm@sha256:365468470075493dc4583f47387001854321c5a8583ea9604b297e67f01c5a4f AS builder
+
+ARG TARGETARCH
+ARG SCARB_VERSION=2.15.1
+ARG DEBIAN_SNAPSHOT=20260727T000000Z
+ARG SCARB_SHA256_AMD64=9cddc1eb612789c0bc973ef7eadcca1424772aa0c12aae070406a0e1f6742b6e
+ARG SCARB_SHA256_ARM64=1c1203e8eb34ab28ac5db71b2c91d47e2d7ee56c203066c7adad8ec84ca4c048
+
+# HTTP bootstraps even the CA-less slim image; APT authenticates signed metadata.
+RUN sed -i \
+      -e "s|http://deb.debian.org/debian-security|http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}|g" \
+      -e "s|http://deb.debian.org/debian|http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}|g" \
+      /etc/apt/sources.list.d/debian.sources \
+    && printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99snapshot \
+    && apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates curl pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) scarb_arch=x86_64; scarb_sha="${SCARB_SHA256_AMD64}" ;; \
+      arm64) scarb_arch=aarch64; scarb_sha="${SCARB_SHA256_ARM64}" ;; \
+      *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    archive="scarb-v${SCARB_VERSION}-${scarb_arch}-unknown-linux-gnu.tar.gz"; \
+    curl --fail --location --silent --show-error \
+      "https://github.com/software-mansion/scarb/releases/download/v${SCARB_VERSION}/${archive}" \
+      --output "/tmp/${archive}"; \
+    echo "${scarb_sha}  /tmp/${archive}" | sha256sum --check --strict; \
+    tar --extract --gzip --file "/tmp/${archive}" --strip-components=2 \
+      --directory /usr/local/bin "scarb-v${SCARB_VERSION}-${scarb_arch}-unknown-linux-gnu/bin"; \
+    rm "/tmp/${archive}"; \
+    scarb --version
+
+WORKDIR /build
+
+COPY rust-toolchain.toml rustfmt.toml Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY apps/provider ./apps/provider
+COPY protocol/programs.json ./protocol/programs.json
+
+RUN cd crates/soul-cairo \
+    && lock_sha256="$(sha256sum Scarb.lock)" \
+    && scarb build \
+    && echo "${lock_sha256}" | sha256sum --check --strict
+RUN expected="$(awk -F '"' '/"artifact_sha256"/ {print $4; exit}' protocol/programs.json)" \
+    && actual="$(sha256sum crates/soul-cairo/target/dev/soul_cairo.executable.json | awk '{print $1}')" \
+    && test "${actual}" = "${expected}"
+RUN cargo build --locked --release --package soul-provider --example local_client \
+    && cargo build --locked --release --package soul-provider
+
+FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818 AS runtime
+
+ARG DEBIAN_SNAPSHOT=20260727T000000Z
+
+# HTTP bootstraps even the CA-less slim image; APT authenticates signed metadata.
+RUN sed -i \
+      -e "s|http://deb.debian.org/debian-security|http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}|g" \
+      -e "s|http://deb.debian.org/debian|http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}|g" \
+      /etc/apt/sources.list.d/debian.sources \
+    && printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99snapshot \
+    && apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates curl libssl3 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 soul \
+    && useradd --uid 10001 --gid soul --no-create-home --shell /usr/sbin/nologin soul \
+    && mkdir -p /app/cairo /app/var/proofs \
+    && chown -R soul:soul /app
 
 WORKDIR /app
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder --chown=soul:soul /build/target/release/soul-provider /app/soul-provider
+COPY --from=builder --chown=soul:soul /build/target/release/examples/local_client /app/soul-local-client
+COPY --from=builder --chown=soul:soul /build/crates/soul-cairo/target/dev/soul_cairo.executable.json /app/cairo/soul_cairo.executable.json
 
-# Copy workspace files
-COPY Cargo.toml Cargo.lock ./
-COPY crates/ crates/
-COPY apps/provider/ apps/provider/
-
-# Build release binary
-RUN cargo build --release --package soul-provider
-
-# Runtime stage
-FROM debian:bookworm-slim
-
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libssl3 \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy binary
-COPY --from=builder /app/target/release/soul-provider /app/soul-provider
-
-# Create non-root user
-RUN useradd -m -u 1000 soul
 USER soul
+EXPOSE 8081
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD pgrep soul-provider || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+  CMD ["curl", "--fail", "--silent", "http://127.0.0.1:8081/healthz"]
 
 ENTRYPOINT ["/app/soul-provider"]

@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible correctness, build, protocol, or UX defect.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security vulnerabilities belong in a private GitHub security advisory.
+        Never paste secret keys, private witnesses, or credentials here.
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: What happened, including the exact error.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What invariant or documented behavior should have held?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include commands and public test-only input.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      placeholder: git rev-parse HEAD
+    validations:
+      required: true
+  - type: textarea
+    id: toolchain
+    attributes:
+      label: Toolchain and platform
+      description: Rust, Scarb, Node, pnpm, OS, architecture, and browser where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Additional evidence
+      description: Sanitized logs, screenshots, or a small public fixture.

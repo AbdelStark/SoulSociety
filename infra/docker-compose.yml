@@ -1,23 +1,20 @@
-version: '3.8'
-
 services:
-  # Local Nostr Relay
   relay:
-    image: scsibug/nostr-rs-relay:latest
+    image: scsibug/nostr-rs-relay:0.10.0@sha256:48d54c2d2781577cf3ed2951112f0953dc2c5e7c9d2ea20c64e8c0fa37d16e4d
+    platform: linux/amd64
     ports:
       - "8080:8080"
     volumes:
       - relay_data:/usr/src/app/db
     environment:
-      - RUST_LOG=info
+      RUST_LOG: info,nostr_rs_relay=info
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
     restart: unless-stopped
 
-  # DVM Provider
   provider:
     build:
       context: ..
@@ -25,54 +22,54 @@ services:
     depends_on:
       relay:
         condition: service_healthy
+    ports:
+      - "8081:8081"
     environment:
-      - NOSTR_RELAY_URL=ws://relay:8080
-      - RUST_LOG=info,soul_provider=debug
-      - PROVIDER_SECRET_KEY=${PROVIDER_SECRET_KEY:-}
-      - PROVIDER_NAME=soul-provider-1
+      SOUL_PROVIDER_MODE: ${SOUL_PROVIDER_MODE:-development}
+      SOUL_PROVIDER_RELAYS: ${SOUL_PROVIDER_RELAYS:-ws://relay:8080}
+      SOUL_PROVIDER_SECRET_KEY: ${SOUL_PROVIDER_SECRET_KEY:-}
+      SOUL_PROVIDER_NAME: ${SOUL_PROVIDER_NAME:-soul-provider-local}
+      SOUL_PROVIDER_HTTP_ADDR: 0.0.0.0:8081
+      SOUL_PROVIDER_ARTIFACT_DIR: /app/var/proofs
+      SOUL_PROVIDER_PUBLIC_BASE_URL: ${SOUL_PROVIDER_PUBLIC_BASE_URL:-http://localhost:8081}
+      SOUL_PROVIDER_MAX_CONCURRENT_PROOFS: ${SOUL_PROVIDER_MAX_CONCURRENT_PROOFS:-1}
+      SOUL_CAIRO_EXECUTABLE: /app/cairo/soul_cairo.executable.json
+      SOUL_CAIRO_PROGRAM_HASH: ${SOUL_CAIRO_PROGRAM_HASH:?set from protocol/programs.json}
+      SOUL_CAIRO_EXECUTABLE_SHA256: ${SOUL_CAIRO_EXECUTABLE_SHA256:?set from protocol/programs.json}
+      RUST_LOG: ${RUST_LOG:-info,soul_provider=debug}
     volumes:
       - provider_data:/app/data
+      - proof_data:/app/var/proofs
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8081/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
     restart: unless-stopped
 
-  # Web Frontend
   web:
     build:
       context: ..
       dockerfile: infra/docker/Dockerfile.web
+      args:
+        VITE_SOUL_RELAYS: ${VITE_SOUL_RELAYS:-ws://localhost:8080}
+        VITE_SOUL_PROVIDER_PUBKEYS: ${VITE_SOUL_PROVIDER_PUBKEYS:?set the reviewed provider public key}
     ports:
-      - "5173:80"
-    depends_on:
-      - relay
-    environment:
-      - VITE_NOSTR_RELAY_URL=ws://localhost:8080
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-
-  # (Optional) Additional provider for redundancy
-  provider-2:
-    build:
-      context: ..
-      dockerfile: infra/docker/Dockerfile.provider
+      - "5173:8080"
     depends_on:
       relay:
         condition: service_healthy
-    environment:
-      - NOSTR_RELAY_URL=ws://relay:8080
-      - RUST_LOG=info
-      - PROVIDER_SECRET_KEY=${PROVIDER_SECRET_KEY_2:-}
-      - PROVIDER_NAME=soul-provider-2
-    profiles:
-      - multi-provider
+      provider:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
     restart: unless-stopped
 
 volumes:
   relay_data:
   provider_data:
-
-networks:
-  default:
-    name: soul-society-network
+  proof_data:

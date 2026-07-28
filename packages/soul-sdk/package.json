@@ -1,7 +1,7 @@
 {
   "name": "@soul-society/sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for Soul Society - Verifiable computation marketplace",
+  "description": "Strict Soul Wire v1 client for signed Nostr requests and local STWO verification",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -14,27 +14,33 @@
   },
   "files": [
     "dist",
-    "src"
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc",
+    "build": "pnpm run clean && tsc",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm run build && node --test tests/*.test.mjs",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
-    "nostr-tools": "^2.10.4"
+    "nostr-tools": "2.10.4"
   },
   "devDependencies": {
-    "typescript": "^5.3.0"
+    "typescript": "5.9.3"
   },
   "peerDependencies": {},
   "keywords": [
     "soul-society",
     "nostr",
     "stark",
-    "zk-proof",
-    "dvm"
+    "stark-proof",
+    "verifiable-computation",
+    "soul-wire"
   ],
   "author": "Abdel <abdel@starkware.co>",
   "license": "MIT",
