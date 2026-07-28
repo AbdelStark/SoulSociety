@@ -142,7 +142,7 @@ export function ReceiptLedger({ jobs }: { jobs: JobRecord[] }) {
     <section className="receipts" id="receipts" aria-labelledby="receipts-title">
       <header className="section-heading section-heading--split">
         <div>
-          <p className="kicker">Local evidence / 002</p>
+          <p className="kicker">Client-side evidence / 05</p>
           <h2 id="receipts-title">Verification receipts</h2>
         </div>
         <p>

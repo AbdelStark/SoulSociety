@@ -7,7 +7,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-1d1b18.svg)](LICENSE)
 [![status: research alpha](https://img.shields.io/badge/status-research_alpha-e85232.svg)](#research-alpha)
 
-[Quickstart](#quickstart) · [Architecture](docs/architecture.md) ·
+[Live site](https://abdelstark.github.io/SoulSociety/) · [Quickstart](#quickstart) · [Architecture](docs/architecture.md) ·
 [Soul Wire](docs/protocol.md) · [Security](docs/security-model.md) ·
 [Contributing](CONTRIBUTING.md)
 
@@ -96,6 +96,18 @@ cleartext. Use test data only.
 
 Read the complete [security model](docs/security-model.md) before building on
 this work.
+
+## Project site
+
+The [GitHub Pages site](https://abdelstark.github.io/SoulSociety/) is a static
+protocol explainer and browser verification interface. Its deployment workflow
+runs only after the repository's `verification` workflow succeeds on `main`,
+then rebuilds the reviewed WASM verifier from source before publishing the
+site.
+
+GitHub Pages does not host a relay, provider, or proof artifact service. The
+public terminal remains intentionally unconfigured until a user supplies
+compatible secure endpoints and an explicitly trusted provider public key.
 
 ## Quickstart
 

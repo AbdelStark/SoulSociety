@@ -1,0 +1,11 @@
+{
+  "program": "soul-cairo-v1",
+  "program_hash": "0x06191fb2725c3a1ebe4843f3200d4556b0041286ad4e13678b99588bae8b13ed",
+  "executable_sha256": "91a80057cfa0196797658ef7c58ca1647392cd93d936d7427d9aa8bae60be256",
+  "proof_sha256": "0cbada4963cb64aad2a8b7ffcbc128ee3d7bb6306394f302f32c492616b53bbe",
+  "proof_size": 2005154,
+  "statement": {
+    "input": 10,
+    "output": 55
+  }
+}

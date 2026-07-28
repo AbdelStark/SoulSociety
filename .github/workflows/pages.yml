@@ -1,0 +1,113 @@
+name: GitHub Pages
+
+on:
+  workflow_run:
+    workflows: [verification]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build:
+    name: build static site
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_sha == github.sha
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      pages: read
+
+    steps:
+      - name: Check out the verified source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Resolve the Pages base path
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Install Node 24.18.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+
+      - name: Cache build toolchains
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            ~/.local/share/pnpm/store
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-pages-v1-${{ hashFiles('Cargo.lock', 'pnpm-lock.yaml', 'rust-toolchain.toml') }}
+
+      - name: Activate pinned build tools
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.17.0
+          rustup toolchain install nightly-2026-01-15 \
+            --profile minimal \
+            --target wasm32-unknown-unknown
+          if [[ "$(wasm-pack --version 2>/dev/null | awk '{print $2}')" != "0.15.0" ]]; then
+            cargo install wasm-pack --version 0.15.0 --locked --force
+          fi
+
+      - name: Verify the toolchain contract
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(pnpm --version)" = "11.17.0"
+          test "$(wasm-pack --version | awk '{print $2}')" = "0.15.0"
+          rustup show active-toolchain | grep --quiet --extended-regexp '^nightly-2026-01-15-'
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the browser verifier and site
+        env:
+          VITE_BASE_PATH: "${{ steps.pages.outputs.base_path }}/"
+        run: |
+          ./scripts/build-wasm.sh
+          pnpm lint
+          pnpm build
+          test -s apps/web/dist/index.html
+          test -s apps/web/dist/favicon.svg
+          test -s apps/web/dist/wasm/programs.json
+          test -s apps/web/dist/wasm/soul_wasm.js
+          test -s apps/web/dist/wasm/soul_wasm_bg.wasm
+          grep --quiet --fixed-strings "${VITE_BASE_PATH}assets/" apps/web/dist/index.html
+          grep --quiet --fixed-strings "${VITE_BASE_PATH}wasm/" apps/web/dist/assets/*.js
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: apps/web/dist
+
+  deploy:
+    name: deploy static site
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
