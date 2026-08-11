@@ -19,7 +19,7 @@ soul-prover = { path = "../../crates/soul-prover" }
 
 # Async runtime
 tokio = { workspace = true }
-async-trait = "=0.1.91"
+async-trait = "=0.1.92"
 
 # Serialization
 serde = { workspace = true }
@@ -46,5 +46,5 @@ url = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }
-tempfile = "=3.23.0"
+tempfile = "=3.27.0"
 tower = { version = "=0.5.3", features = ["util"] }
