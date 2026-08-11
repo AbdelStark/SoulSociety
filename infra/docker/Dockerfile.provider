@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
-FROM rust:1.94.0-bookworm@sha256:365468470075493dc4583f47387001854321c5a8583ea9604b297e67f01c5a4f AS builder
+FROM rust:1.97.0-bookworm@sha256:8fa55b2f3ddf97471ab6a767bfa3f37e6bad0986ba823e75fea57e2a2a5c3073 AS builder
 
 ARG TARGETARCH
 ARG SCARB_VERSION=2.15.1
@@ -51,7 +51,7 @@ RUN expected="$(awk -F '"' '/"artifact_sha256"/ {print $4; exit}' protocol/progr
 RUN cargo build --locked --release --package soul-provider --example local_client \
     && cargo build --locked --release --package soul-provider
 
-FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818 AS runtime
+FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS runtime
 
 ARG DEBIAN_SNAPSHOT=20260727T000000Z
 
